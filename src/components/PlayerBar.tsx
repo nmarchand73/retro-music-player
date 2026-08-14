@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { BookmarkButton } from './BookmarkButton';
 import { MiniSpectrum } from './MiniSpectrum';
+import { Spectrum3D } from './Spectrum3D';
 import { TrackCover } from './TrackCover';
 import type { PlayerStatus } from '../hooks/useMusicPlayer';
 import type { Track } from '../types';
@@ -51,12 +52,50 @@ export function PlayerBar({
   const shownPosition = scrub ?? position;
   const titleDuration =
     duration > 0 ? formatClock(duration) : status !== 'loading' && track ? formatDuration(duration) : null;
+  const playing = status === 'playing';
 
   const commitSeek = (seconds: number) => {
     draggingRef.current = false;
     onSeek(seconds);
     setScrub(null);
   };
+
+  const seekControls = (
+    <div className="player-progress">
+      <span>{formatClock(shownPosition)}</span>
+      <label className="progress-track">
+        <span className="visually-hidden">Seek</span>
+        <input
+          type="range"
+          min={0}
+          max={canSeek ? duration : 1}
+          step={0.1}
+          value={canSeek ? Math.min(shownPosition, duration) : 0}
+          disabled={!canSeek || !track}
+          aria-label="Seek"
+          onPointerDown={() => {
+            draggingRef.current = true;
+            setScrub(position);
+          }}
+          onInput={(event) => setScrub(Number(event.currentTarget.value))}
+          onChange={(event) => {
+            const value = Number(event.currentTarget.value);
+            if (draggingRef.current) {
+              setScrub(value);
+              return;
+            }
+            commitSeek(value);
+          }}
+          onPointerUp={(event) => commitSeek(Number(event.currentTarget.value))}
+          onPointerCancel={() => {
+            draggingRef.current = false;
+            setScrub(null);
+          }}
+        />
+      </label>
+      <span>{formatDuration(duration)}</span>
+    </div>
+  );
 
   if (minimized) {
     return (
@@ -82,7 +121,7 @@ export function PlayerBar({
           {error && <span className="player-error">{error}</span>}
         </div>
 
-        <MiniSpectrum analyser={analyser} playing={status === 'playing'} />
+        <MiniSpectrum analyser={analyser} playing={playing} />
 
         <div className="player-controls">
           <button
@@ -101,87 +140,91 @@ export function PlayerBar({
   }
 
   return (
-    <footer className="player-bar" aria-label="Player">
-      <div className="player-info">
-        {track ? (
-          <>
-            <TrackCover track={track} className="player-cover" />
-            <div className="player-copy">
-              <div className="player-title">
-                <strong>{track.title}</strong>
-                {titleDuration && <span className="player-title-duration">{titleDuration}</span>}
-                <BookmarkButton title={track.title} bookmarked={bookmarked} onToggle={onToggleBookmark} />
-              </div>
-              <span className="player-artist">
-                {track.artist}
-                {track.game ? ` · ${track.game}` : ''}
-                {status === 'loading' ? ' · Loading…' : ''}
-              </span>
+    <footer
+      className={`player-bar is-expanded${playing ? ' is-playing' : ''}${track?.coverUrl ? ' has-art' : ''}`}
+      aria-label="Player"
+    >
+      {track?.coverUrl ? (
+        <div
+          className="player-stage-bg"
+          style={{ backgroundImage: `url(${track.coverUrl})` }}
+          aria-hidden="true"
+        />
+      ) : (
+        <div className="player-stage-bg is-fallback" aria-hidden="true" />
+      )}
+      <div className="player-stage-veil" aria-hidden="true" />
+
+      <div className="player-stage">
+        <aside className="player-stage-side">
+          <div className={`player-stage-art${playing ? ' is-live' : ''}`}>
+            <div className="player-art-glow" aria-hidden="true" />
+            <div className="player-art-frame">
+              {track ? (
+                <TrackCover track={track} className="player-cover-hero" />
+              ) : (
+                <span className="player-cover-hero is-placeholder" aria-hidden="true">
+                  ?
+                </span>
+              )}
             </div>
-          </>
-        ) : (
-          <span className="muted">Pick a track to play — search above, then click a result</span>
-        )}
-        {error && <span className="player-error">{error}</span>}
+          </div>
+
+          <div className="player-hud-meta">
+            {track ? (
+              <>
+                <div className="player-title">
+                  <strong>{track.title}</strong>
+                  <BookmarkButton title={track.title} bookmarked={bookmarked} onToggle={onToggleBookmark} />
+                </div>
+                {titleDuration && <span className="player-title-duration">{titleDuration}</span>}
+                <span className="player-artist">
+                  {track.artist}
+                  {track.game ? ` · ${track.game}` : ''}
+                  {status === 'loading' ? ' · Loading…' : ''}
+                </span>
+                {track.platform ? (
+                  <span className="player-platform-chip" data-platform={track.platform}>
+                    {track.platform === 'amiga' ? 'Amiga' : 'Atari ST'}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <span className="muted">Pick a track to play</span>
+            )}
+            {error && <span className="player-error">{error}</span>}
+          </div>
+        </aside>
+
+        <div className="player-stage-viz">
+          <Spectrum3D analyser={analyser} playing={playing} variant="panel" />
+        </div>
       </div>
 
-      <div className="player-controls">
-        <button type="button" onClick={onPrevious} aria-label="Previous track" disabled={!hasPrevious}>
-          <PrevIcon />
-        </button>
-        <button
-          type="button"
-          className="player-play"
-          onClick={onPlayPause}
-          aria-label={showPause ? 'Pause' : 'Play'}
-          disabled={!canPlayPause}
-        >
-          <span>{showPause ? 'Pause' : 'Play'}</span>
-          {showPause ? <PauseIcon /> : <PlayIcon />}
-        </button>
-        <button type="button" onClick={onNext} aria-label="Next track" disabled={!hasNext}>
-          <NextIcon />
-        </button>
-        <button type="button" onClick={onStop} aria-label="Stop" disabled={!track}>
-          <StopIcon />
-        </button>
+      <div className="player-hud-dock">
+        <div className="player-controls">
+          <button type="button" onClick={onPrevious} aria-label="Previous track" disabled={!hasPrevious}>
+            <PrevIcon />
+          </button>
+          <button
+            type="button"
+            className="player-play"
+            onClick={onPlayPause}
+            aria-label={showPause ? 'Pause' : 'Play'}
+            disabled={!canPlayPause}
+          >
+            <span>{showPause ? 'Pause' : 'Play'}</span>
+            {showPause ? <PauseIcon /> : <PlayIcon />}
+          </button>
+          <button type="button" onClick={onNext} aria-label="Next track" disabled={!hasNext}>
+            <NextIcon />
+          </button>
+          <button type="button" onClick={onStop} aria-label="Stop" disabled={!track}>
+            <StopIcon />
+          </button>
+        </div>
+        {seekControls}
       </div>
-
-      <div className="player-progress">
-        <span>{formatClock(shownPosition)}</span>
-        <label className="progress-track">
-          <span className="visually-hidden">Seek</span>
-          <input
-            type="range"
-            min={0}
-            max={canSeek ? duration : 1}
-            step={0.1}
-            value={canSeek ? Math.min(shownPosition, duration) : 0}
-            disabled={!canSeek || !track}
-            aria-label="Seek"
-            onPointerDown={() => {
-              draggingRef.current = true;
-              setScrub(position);
-            }}
-            onInput={(event) => setScrub(Number(event.currentTarget.value))}
-            onChange={(event) => {
-              const value = Number(event.currentTarget.value);
-              if (draggingRef.current) {
-                setScrub(value);
-                return;
-              }
-              commitSeek(value);
-            }}
-            onPointerUp={(event) => commitSeek(Number(event.currentTarget.value))}
-            onPointerCancel={() => {
-              draggingRef.current = false;
-              setScrub(null);
-            }}
-          />
-        </label>
-        <span>{formatDuration(duration)}</span>
-      </div>
-      <span className="keyboard-hint">Space pause · ← → seek 5s</span>
     </footer>
   );
 }

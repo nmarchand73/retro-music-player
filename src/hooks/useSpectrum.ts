@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-const BAR_COUNT = 48;
 const PEAK_HOLD_FRAMES = 18;
 const PEAK_FALL = 0.014;
 const FLOOR = 0.02;
@@ -9,7 +8,6 @@ const RELEASE = 0.28;
 
 function groupBins(data: Uint8Array, groups: number): Float32Array {
   const out = new Float32Array(groups);
-  // Skip DC / very-low bins; keep most of the spectrum for mid/high detail.
   const lo = 2;
   const hi = Math.max(lo + 1, Math.floor(data.length * 0.72));
   const span = hi / lo;
@@ -22,7 +20,6 @@ function groupBins(data: Uint8Array, groups: number): Float32Array {
       const v = data[j] ?? 0;
       if (v > peak) peak = v;
     }
-    // Emphasize differences between quiet and loud bins.
     const norm = peak / 255;
     out[i] = Math.pow(norm, 1.15);
   }
@@ -52,12 +49,25 @@ function fillRoundRect(
   ctx.fill();
 }
 
-export function useSpectrum(analyser: AnalyserNode | null, playing: boolean, mounted: boolean) {
+export function useSpectrum(
+  analyser: AnalyserNode | null,
+  playing: boolean,
+  mounted: boolean,
+  barCount = 48,
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number | null>(null);
-  const peaksRef = useRef<Float32Array>(new Float32Array(BAR_COUNT));
-  const peakHoldRef = useRef<Int16Array>(new Int16Array(BAR_COUNT));
-  const displayRef = useRef<Float32Array>(new Float32Array(BAR_COUNT));
+  const peaksRef = useRef<Float32Array>(new Float32Array(barCount));
+  const peakHoldRef = useRef<Int16Array>(new Int16Array(barCount));
+  const displayRef = useRef<Float32Array>(new Float32Array(barCount));
+
+  useEffect(() => {
+    if (peaksRef.current.length !== barCount) {
+      peaksRef.current = new Float32Array(barCount);
+      peakHoldRef.current = new Int16Array(barCount);
+      displayRef.current = new Float32Array(barCount);
+    }
+  }, [barCount]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -79,9 +89,9 @@ export function useSpectrum(analyser: AnalyserNode | null, playing: boolean, mou
       if (!ctx) return;
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
-      const gap = Math.max(1.5, width / (BAR_COUNT * 4.4));
-      const barW = (width - gap * (BAR_COUNT - 1)) / BAR_COUNT;
-      for (let i = 0; i < BAR_COUNT; i += 1) {
+      const gap = Math.max(1.5, width / (barCount * 4.4));
+      const barW = (width - gap * (barCount - 1)) / barCount;
+      for (let i = 0; i < barCount; i += 1) {
         const x = i * (barW + gap);
         const h = height * (FLOOR + ((i * 17) % 7) * 0.007);
         const y = height - h;
@@ -99,7 +109,6 @@ export function useSpectrum(analyser: AnalyserNode | null, playing: boolean, mou
       return () => observer.disconnect();
     }
 
-    // Prefer snappy FFT for this view even if the node was created elsewhere.
     analyser.smoothingTimeConstant = Math.min(analyser.smoothingTimeConstant, 0.22);
     analyser.minDecibels = -92;
     analyser.maxDecibels = -18;
@@ -111,16 +120,16 @@ export function useSpectrum(analyser: AnalyserNode | null, playing: boolean, mou
 
     const draw = () => {
       analyser.getByteFrequencyData(buffer);
-      const levels = groupBins(buffer, BAR_COUNT);
+      const levels = groupBins(buffer, barCount);
       const ctx = canvas.getContext('2d');
       if (ctx) {
         const { width, height } = canvas;
-        const gap = Math.max(1.5, width / (BAR_COUNT * 4.4));
-        const barW = (width - gap * (BAR_COUNT - 1)) / BAR_COUNT;
+        const gap = Math.max(1.5, width / (barCount * 4.4));
+        const barW = (width - gap * (barCount - 1)) / barCount;
         const radius = Math.min(barW / 2, Math.max(2, height * 0.08));
         const drawH = height * 0.82;
-        const peakThickness = Math.max(2, height * 0.055);
-        const peakGap = Math.max(1.5, height * 0.035);
+        const peakThickness = Math.max(2, height * 0.05);
+        const peakGap = Math.max(1.5, height * 0.03);
 
         ctx.clearRect(0, 0, width, height);
 
@@ -136,7 +145,7 @@ export function useSpectrum(analyser: AnalyserNode | null, playing: boolean, mou
         gradient.addColorStop(0.78, '#7b4ec4');
         gradient.addColorStop(1, '#3d2f8a');
 
-        for (let i = 0; i < BAR_COUNT; i += 1) {
+        for (let i = 0; i < barCount; i += 1) {
           const target = playing ? Math.min(1, levels[i]! * 1.35) : levels[i]! * 0.12;
           const prev = display[i]!;
           const next =
@@ -196,7 +205,7 @@ export function useSpectrum(analyser: AnalyserNode | null, playing: boolean, mou
       observer.disconnect();
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [analyser, playing, mounted]);
+  }, [analyser, playing, mounted, barCount]);
 
   return { canvasRef };
 }
