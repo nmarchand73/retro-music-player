@@ -2,7 +2,7 @@ export type MusicPlatform = 'amiga' | 'atari' | 'all';
 
 export type SearchField = 'any' | 'author' | 'game' | 'title';
 
-export type TrackSource = 'modarchive' | 'sndh' | 'local';
+export type TrackSource = 'sndh' | 'local';
 
 export interface Track {
   id: string;
@@ -28,7 +28,6 @@ export interface SearchResponse {
   total: number;
   tracks: Track[];
   sources: {
-    modarchive: { connected: boolean; message: string };
     sndh: { connected: boolean; message: string };
     local: { connected: boolean; message: string };
   };

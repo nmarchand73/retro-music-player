@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Local SNDH archive (https://sndh.atari.org/download.php)
+data/sndh/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +25,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright
+test-results
+playwright-report
+blob-report
+playwright/.cache

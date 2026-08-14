@@ -2,32 +2,6 @@ import type { SearchField, Track } from './types.js';
 
 export const localCatalog: Track[] = [
   {
-    id: 'demo-amiga-1',
-    source: 'local',
-    platform: 'amiga',
-    title: 'Space Debris',
-    artist: 'LMan',
-    format: 'MOD',
-    channels: 4,
-    genre: 'Chiptune',
-    notes: 'Classic Amiga demo tune — browse Mod Archive for thousands more.',
-    streamUrl: '/api/stream/local/demo-amiga-1',
-    detailUrl: 'https://modarchive.org/',
-  },
-  {
-    id: 'demo-amiga-2',
-    source: 'local',
-    platform: 'amiga',
-    title: 'Enigma',
-    artist: 'Skylord',
-    format: 'MOD',
-    channels: 4,
-    genre: 'Demo',
-    notes: 'Representative Amiga tracker module.',
-    streamUrl: '/api/stream/local/demo-amiga-2',
-    detailUrl: 'https://amp.dascene.net/',
-  },
-  {
     id: 'demo-atari-1',
     source: 'local',
     platform: 'atari',
@@ -75,7 +49,6 @@ function matchesField(track: Track, q: string, field: SearchField): boolean {
     case 'game':
       return title.includes(q) || game.includes(q) || notes.includes(q);
     case 'any':
-    default:
       return (
         title.includes(q) ||
         artist.includes(q) ||
@@ -84,6 +57,10 @@ function matchesField(track: Track, q: string, field: SearchField): boolean {
         game.includes(q) ||
         track.format.toLowerCase().includes(q)
       );
+    default: {
+      const _exhaustive: never = field;
+      throw new Error(`Unhandled search field: ${_exhaustive}`);
+    }
   }
 }
 

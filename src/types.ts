@@ -2,7 +2,7 @@ export type MusicPlatform = 'amiga' | 'atari' | 'all';
 
 export type SearchField = 'any' | 'author' | 'game' | 'title';
 
-export type TrackSource = 'modarchive' | 'sndh' | 'local';
+export type TrackSource = 'sndh' | 'local';
 
 export interface Track {
   id: string;

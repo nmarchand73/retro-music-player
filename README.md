@@ -1,19 +1,17 @@
 # Retro Music Player
 
-A React front-end music library and player for **Atari ST** and **Amiga** tracker/chiptune music.
+A React front-end music library and player for **Atari ST** YM2149 chiptunes.
 
 ## Connected Databases
 
 | Database | Platform | API | Status |
 |----------|----------|-----|--------|
-| [The Mod Archive](https://modarchive.org/) | Amiga + Atari ST (MOD/STM) | `https://api.modarchive.org/xml-tools.php` | Requires free API key |
-| [SNDH Archive](https://sndh.atari.org/) | Atari ST YM2149 | Search via sndh.atari.org | Connected (no key) |
+| [SNDH Archive](https://sndh.atari.org/) | Atari ST YM2149 | Local dump in `data/sndh/sndh_lf` | Offline search + playback |
 | [Amiga Music Preservation](https://amp.dascene.net/) | Amiga metadata | No public API | Reference only |
-| Local demo catalog | Both | Built-in | Always available |
+| Local demo catalog | Atari ST | Built-in | Always available |
 
 ## Playback Engines
 
-- **Amiga / tracker modules** (MOD, MED, XM, S3M, STM): [chiptune3](https://github.com/DrSnuggles/chiptune) (libopenmpt WebAssembly)
 - **Atari ST SNDH**: [ym2149-wasm](https://github.com/slippyex/ym2149-rs)
 
 ## Setup
@@ -24,11 +22,15 @@ npm install
 cp .env.example .env
 ```
 
-Add your Mod Archive API key to `.env` (request one at https://modarchive.org/forums/index.php?topic=1950.0):
+### Local SNDH archive
 
-```
-MODARCHIVE_API_KEY=your_key_here
-```
+The player searches and streams Atari tunes from a local copy of the official dump:
+
+1. Download [sndh2026_lf.zip](https://sndh.atari.org/files/sndh2026_lf.zip) from [sndh.atari.org/download.php](https://sndh.atari.org/download.php).
+2. Extract it to `data/sndh/` so files live under `data/sndh/sndh_lf/<composer>/…`.
+3. Restart the server. The SNDH card should show **5,897 local SNDH files**.
+
+Override the folder with `SNDH_ARCHIVE_DIR` if needed. Without a local dump, search falls back to sndh.atari.org.
 
 ## Development
 

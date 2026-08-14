@@ -60,13 +60,14 @@ function App() {
           <p className="eyebrow">Retro Music Library</p>
           <h1>Atari ST &amp; Amiga Player</h1>
           <p className="lede">
-            Browse and play tracker modules from The Mod Archive and YM2149 chiptunes from the
-            official SNDH archive.
+            Browse and play YM2149 chiptunes from the local SNDH archive.
           </p>
         </div>
         <form className="search-form" onSubmit={handleSubmit}>
           <input
             type="search"
+            name="q"
+            aria-label="Search music"
             placeholder={SEARCH_FIELD_PLACEHOLDERS[field]}
             value={query}
             onChange={(event) => setQuery(event.target.value)}

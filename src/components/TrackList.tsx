@@ -9,8 +9,7 @@ interface TrackListProps {
   onPlay: (track: Track) => void;
 }
 
-const sourceLabels = {
-  modarchive: 'Mod Archive',
+const sourceLabels: Record<Track['source'], string> = {
   sndh: 'SNDH',
   local: 'Local',
 };
@@ -47,7 +46,12 @@ export function TrackList({ tracks, loading, currentTrackId, searchField, onPlay
           const active = currentTrackId === `${track.source}:${track.id}`;
           return (
             <li key={`${track.source}:${track.id}`} className={active ? 'active' : ''}>
-              <button type="button" className="track-row" onClick={() => onPlay(track)}>
+              <button
+                type="button"
+                className="track-row"
+                aria-label={`Play ${track.title}`}
+                onClick={() => onPlay(track)}
+              >
                 <span className="platform-badge" data-platform={track.platform}>
                   {track.platform === 'amiga' ? 'AMIGA' : 'ATARI'}
                 </span>

@@ -4,49 +4,48 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { searchLocalCatalog, getLocalTrack } from './data/localCatalog.js';
 import {
-  getModArchiveTrack,
-  hasModArchiveKey,
-  modArchiveDownloadUrl,
-  searchModArchive,
-} from './services/modarchive.js';
-import { getSndhTrack, searchSndh, sndhDownloadUrl, sndhReferer } from './services/sndh.js';
+  findLocalSndhByTitle,
+  getSndhTrack,
+  loadSndhIndex,
+  localSndhStats,
+  resolveSndhFilePath,
+  searchSndh,
+  sndhDownloadUrl,
+  sndhReferer,
+} from './services/sndh.js';
 import type { DatabaseInfo, MusicPlatform, SearchField, SearchResponse, Track } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3001;
-const MODARCHIVE_API_KEY = process.env.MODARCHIVE_API_KEY;
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, modArchiveConfigured: hasModArchiveKey(MODARCHIVE_API_KEY) });
+app.get('/api/health', async (_req, res) => {
+  const sndh = await localSndhStats();
+  res.json({
+    ok: true,
+    sndhLocal: sndh,
+  });
 });
 
-app.get('/api/databases', (_req, res) => {
+app.get('/api/databases', async (_req, res) => {
+  const sndh = await localSndhStats();
   const databases: DatabaseInfo[] = [
-    {
-      id: 'modarchive',
-      name: 'The Mod Archive',
-      description:
-        'World\'s largest tracker module collection — Amiga MOD/MED/XM/S3M and Atari ST STM formats.',
-      platform: 'both',
-      url: 'https://modarchive.org/',
-      apiUrl: 'https://api.modarchive.org/xml-tools.php',
-      connected: hasModArchiveKey(MODARCHIVE_API_KEY),
-      requiresKey: true,
-      stats: '100,000+ modules',
-    },
     {
       id: 'sndh',
       name: 'SNDH Archive',
-      description: 'Official Atari ST/STe YM2149 chiptune archive with 5,900+ SNDH files.',
+      description: sndh.connected
+        ? 'Local Atari ST/STe YM2149 dump from sndh.atari.org, searched and played from disk.'
+        : 'Official Atari ST/STe YM2149 chiptune archive. Download sndh2026_lf.zip into data/sndh to play offline.',
       platform: 'atari',
       url: 'https://sndh.atari.org/',
-      connected: true,
+      connected: sndh.connected,
       requiresKey: false,
-      stats: '11,900+ subtunes',
+      stats: sndh.connected
+        ? `${sndh.count.toLocaleString('en-US')} local SNDH files`
+        : 'Archive missing',
     },
     {
       id: 'amp',
@@ -62,11 +61,11 @@ app.get('/api/databases', (_req, res) => {
     {
       id: 'local',
       name: 'Local Demo Catalog',
-      description: 'Built-in sample tracks when remote databases are unavailable.',
-      platform: 'both',
+      description: 'Built-in Atari sample tracks from the local SNDH dump.',
+      platform: 'atari',
       connected: true,
       requiresKey: false,
-      stats: '4 demo tracks',
+      stats: '2 demo tracks',
     },
   ];
 
@@ -81,12 +80,6 @@ app.get('/api/search', async (req, res) => {
   try {
     const tasks: Promise<Track[]>[] = [Promise.resolve(searchLocalCatalog(query, platform, field))];
 
-    if (platform === 'all' || platform === 'amiga' || platform === 'atari') {
-      if (hasModArchiveKey(MODARCHIVE_API_KEY)) {
-        tasks.push(searchModArchive(query, MODARCHIVE_API_KEY, platform, field));
-      }
-    }
-
     if (platform === 'all' || platform === 'atari') {
       tasks.push(searchSndh(query, field));
     }
@@ -99,6 +92,7 @@ app.get('/api/search', async (req, res) => {
       unique.set(`${track.source}:${track.id}`, track);
     }
 
+    const sndh = await localSndhStats();
     const response: SearchResponse = {
       query,
       platform,
@@ -106,15 +100,11 @@ app.get('/api/search', async (req, res) => {
       total: unique.size,
       tracks: Array.from(unique.values()),
       sources: {
-        modarchive: {
-          connected: hasModArchiveKey(MODARCHIVE_API_KEY),
-          message: hasModArchiveKey(MODARCHIVE_API_KEY)
-            ? 'Connected to Mod Archive XML API'
-            : 'Set MODARCHIVE_API_KEY in .env — request free key at modarchive.org/forums',
-        },
         sndh: {
-          connected: true,
-          message: 'Connected to sndh.atari.org search',
+          connected: sndh.connected,
+          message: sndh.connected
+            ? `Local SNDH archive (${sndh.count.toLocaleString('en-US')} files)`
+            : 'No local SNDH dump — falling back to sndh.atari.org',
         },
         local: {
           connected: true,
@@ -134,8 +124,7 @@ app.get('/api/track/:source/:id', async (req, res) => {
 
   try {
     let track = null;
-    if (source === 'modarchive') track = await getModArchiveTrack(id, MODARCHIVE_API_KEY);
-    else if (source === 'sndh') track = await getSndhTrack(id);
+    if (source === 'sndh') track = await getSndhTrack(id);
     else if (source === 'local') track = getLocalTrack(id) ?? null;
 
     if (!track) {
@@ -153,20 +142,15 @@ app.get('/api/stream/:source/:id', async (req, res) => {
   const { source, id } = req.params;
 
   try {
-    if (source === 'modarchive') {
-      const upstream = await fetch(modArchiveDownloadUrl(id));
-      if (!upstream.ok) {
-        res.status(upstream.status).json({ error: 'Mod Archive download failed' });
+    if (source === 'sndh') {
+      const localPath = await resolveSndhFilePath(id);
+      if (localPath) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.sendFile(localPath);
         return;
       }
-      res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/octet-stream');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      const buffer = Buffer.from(await upstream.arrayBuffer());
-      res.send(buffer);
-      return;
-    }
 
-    if (source === 'sndh') {
       const upstream = await fetch(sndhDownloadUrl(id), {
         headers: {
           Referer: sndhReferer(id),
@@ -186,10 +170,22 @@ app.get('/api/stream/:source/:id', async (req, res) => {
     }
 
     if (source === 'local') {
-      // Redirect local demos to well-known public domain / archive samples
+      const localAtariTitles: Record<string, string> = {
+        'demo-atari-1': 'Second Reality 2013',
+        'demo-atari-2': 'Batman The Movie',
+      };
+      const localAtari = localAtariTitles[id];
+      if (localAtari) {
+        const match = await findLocalSndhByTitle(localAtari);
+        if (match) {
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.sendFile(match.absolutePath);
+          return;
+        }
+      }
+
       const demoUrls: Record<string, string> = {
-        'demo-amiga-1': 'https://api.modarchive.org/downloads.php?moduleid=41529',
-        'demo-amiga-2': 'https://api.modarchive.org/downloads.php?moduleid=601',
         'demo-atari-1': sndhDownloadUrl('6326'),
         'demo-atari-2': sndhDownloadUrl('6324'),
       };
@@ -229,11 +225,12 @@ app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
+const sndhIndex = await loadSndhIndex();
 app.listen(PORT, () => {
   console.log(`Retro Music Player API on http://localhost:${PORT}`);
   console.log(
-    hasModArchiveKey(MODARCHIVE_API_KEY)
-      ? 'Mod Archive API key configured'
-      : 'No Mod Archive API key — using SNDH + local catalog only',
+    sndhIndex.length > 0
+      ? `Local SNDH archive: ${sndhIndex.length.toLocaleString('en-US')} files`
+      : 'No local SNDH archive — place sndh2026_lf.zip extract in data/sndh/sndh_lf',
   );
 });

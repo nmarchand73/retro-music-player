@@ -31,7 +31,7 @@ export function PlayerBar({
   const progress = duration > 0 ? Math.min((position / duration) * 100, 100) : 0;
 
   return (
-    <footer className="player-bar">
+    <footer className="player-bar" aria-label="Player">
       <div className="player-info">
         {track ? (
           <>
