@@ -1,21 +1,32 @@
 # Retro Music Player
 
-A React front-end music library and player for **Atari ST**, **Amiga**, **Amstrad CPC**, and **Commodore 64** music.
+Browser library and player for **Atari ST**, **Amiga**, **Amstrad CPC**, and **Commodore 64** music — local archives, chip/tracker playback, and a 3D spectrum stage.
+
+Repository: [github.com/nmarchand73/retro-music-player](https://github.com/nmarchand73/retro-music-player)
+
+## Features
+
+- Search across Atari SNDH, Amiga UnExoticA, CPC SNDH/YM, and C64 HVSC
+- Playback: YM2149 (ST/CPC), SID (C64), libopenmpt trackers, UADE exotic Amiga
+- Expanded player with cover art (when available), title marquee, and Three.js spectrum
+- Bookmarks, Top Games, Insights, and per-machine library filters
 
 ## Connected Databases
 
-| Database | Platform | API | Status |
-|----------|----------|-----|--------|
-| [SNDH Archive](https://sndh.atari.org/) | Atari ST YM2149 | Local dump in `data/sndh/sndh_lf` | Offline search + playback |
-| [UnExoticA](https://www.exotica.org.uk/wiki/UnExoticA) | Amiga | Local extracts in `data/amiga/unexotica` | Offline search + playback |
+| Database | Platform | Source | Status |
+|----------|----------|--------|--------|
+| [SNDH Archive](https://sndh.atari.org/) | Atari ST YM2149 | Local `data/sndh/sndh_lf` | Offline search + playback |
+| [UnExoticA](https://www.exotica.org.uk/wiki/UnExoticA) | Amiga | Local `data/amiga/unexotica` | Offline search + playback |
 | CPC Archive | Amstrad CPC YM2149 | Local `data/cpc/cpc_lf` (SNDH) + `ym_games` (YM) | Offline search + playback |
-| [HVSC](https://hvsc.c64.org/) | Commodore 64 SID | Local extract in `data/c64/HVSC/C64Music` | Offline search + playback |
+| [HVSC](https://hvsc.c64.org/) | Commodore 64 SID | Local `data/c64/HVSC/C64Music` | Offline search + playback |
 | [Amiga Music Preservation](https://amp.dascene.net/) | Amiga metadata | No public API | Reference only |
 | Local demo catalog | Atari ST | Built-in | Always available |
 
+Large music dumps under `data/` are gitignored — clone the repo, then add archives locally as below.
+
 ## Playback Engines
 
-- **Atari ST / CPC SNDH**: [ym2149-wasm](https://github.com/slippyex/ym2149-rs)
+- **Atari ST / CPC SNDH & YM**: [ym2149-wasm](https://github.com/slippyex/ym2149-rs)
 - **Commodore 64 SID**: [libsidplayfp-wasm](https://github.com/chrisgleissner/libsidplayfp-wasm) (SIDLite)
 - **Amiga trackers (MOD/XM/…)**: [chiptune3](https://github.com/jsschelling/chiptune3) / libopenmpt
 - **Amiga exotic formats (CUST/MDAT/RJP/AGI/…)**: [UADE](http://zakalwe.fi/uade/) via `uade123` on the server (renders to WAV)
@@ -31,6 +42,7 @@ Optional override: `UADE_BIN=/path/to/uade123`. Without UADE, only openmpt-compa
 ## Setup
 
 ```bash
+git clone https://github.com/nmarchand73/retro-music-player.git
 cd retro-music-player
 npm install
 cp .env.example .env
@@ -112,3 +124,4 @@ Serves the built React app and API from port 3001.
 - `GET /api/search?q=...&platform=all|amiga|atari|cpc|c64` — search across databases
 - `GET /api/track/:source/:id` — track metadata
 - `GET /api/stream/:source/:id` — audio file stream
+- `GET /api/insights` — archive inventory (composers, games, formats, coverage)
