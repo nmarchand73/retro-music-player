@@ -10,7 +10,7 @@ import {
   searchModArchive,
 } from './services/modarchive.js';
 import { getSndhTrack, searchSndh, sndhDownloadUrl, sndhReferer } from './services/sndh.js';
-import type { DatabaseInfo, MusicPlatform, SearchResponse, Track } from './types.js';
+import type { DatabaseInfo, MusicPlatform, SearchField, SearchResponse, Track } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3001;
@@ -76,18 +76,19 @@ app.get('/api/databases', (_req, res) => {
 app.get('/api/search', async (req, res) => {
   const query = String(req.query.q ?? '').trim();
   const platform = (String(req.query.platform ?? 'all') as MusicPlatform) || 'all';
+  const field = (String(req.query.field ?? 'any') as SearchField) || 'any';
 
   try {
-    const tasks: Promise<Track[]>[] = [Promise.resolve(searchLocalCatalog(query, platform))];
+    const tasks: Promise<Track[]>[] = [Promise.resolve(searchLocalCatalog(query, platform, field))];
 
     if (platform === 'all' || platform === 'amiga' || platform === 'atari') {
       if (hasModArchiveKey(MODARCHIVE_API_KEY)) {
-        tasks.push(searchModArchive(query, MODARCHIVE_API_KEY, platform));
+        tasks.push(searchModArchive(query, MODARCHIVE_API_KEY, platform, field));
       }
     }
 
     if (platform === 'all' || platform === 'atari') {
-      tasks.push(searchSndh(query));
+      tasks.push(searchSndh(query, field));
     }
 
     const resultSets = await Promise.allSettled(tasks);
@@ -101,6 +102,7 @@ app.get('/api/search', async (req, res) => {
     const response: SearchResponse = {
       query,
       platform,
+      field,
       total: unique.size,
       tracks: Array.from(unique.values()),
       sources: {

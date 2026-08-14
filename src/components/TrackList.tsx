@@ -1,9 +1,11 @@
-import type { Track } from '../types';
+import type { SearchField, Track } from '../types';
+import { SEARCH_FIELD_LABELS } from '../types';
 
 interface TrackListProps {
   tracks: Track[];
   loading: boolean;
   currentTrackId: string | null;
+  searchField: SearchField;
   onPlay: (track: Track) => void;
 }
 
@@ -13,7 +15,7 @@ const sourceLabels = {
   local: 'Local',
 };
 
-export function TrackList({ tracks, loading, currentTrackId, onPlay }: TrackListProps) {
+export function TrackList({ tracks, loading, currentTrackId, searchField, onPlay }: TrackListProps) {
   if (loading) {
     return (
       <section className="panel track-panel">
@@ -25,7 +27,9 @@ export function TrackList({ tracks, loading, currentTrackId, onPlay }: TrackList
   if (tracks.length === 0) {
     return (
       <section className="panel track-panel">
-        <p className="muted">No tracks found. Try a different search or platform filter.</p>
+        <p className="muted">
+          No tracks found for {SEARCH_FIELD_LABELS[searchField].toLowerCase()}. Try another term or search field.
+        </p>
       </section>
     );
   }
@@ -34,7 +38,9 @@ export function TrackList({ tracks, loading, currentTrackId, onPlay }: TrackList
     <section className="panel track-panel">
       <header className="panel-header">
         <h2>Library Results</h2>
-        <p className="muted">{tracks.length} tracks</p>
+        <p className="muted">
+          {tracks.length} tracks · {SEARCH_FIELD_LABELS[searchField]}
+        </p>
       </header>
       <ul className="track-list">
         {tracks.map((track) => {
@@ -48,9 +54,12 @@ export function TrackList({ tracks, loading, currentTrackId, onPlay }: TrackList
                 <span className="track-main">
                   <strong>{track.title}</strong>
                   <span className="track-artist">{track.artist}</span>
+                  {track.game && <span className="track-game">Game: {track.game}</span>}
+                  {track.notes && !track.game && <span className="track-notes">{track.notes}</span>}
                 </span>
                 <span className="track-meta">
                   <span className="chip">{track.format}</span>
+                  {track.genre && <span className="chip subtle">{track.genre}</span>}
                   <span className="chip subtle">{sourceLabels[track.source]}</span>
                 </span>
               </button>

@@ -1,4 +1,4 @@
-import type { DatabaseInfo, MusicPlatform, SearchResponse, Track } from './types';
+import type { DatabaseInfo, MusicPlatform, SearchField, SearchResponse, Track } from './types';
 
 const API_BASE = '/api';
 
@@ -9,8 +9,12 @@ export async function fetchDatabases(): Promise<DatabaseInfo[]> {
   return data.databases;
 }
 
-export async function searchTracks(query: string, platform: MusicPlatform): Promise<SearchResponse> {
-  const params = new URLSearchParams({ q: query, platform });
+export async function searchTracks(
+  query: string,
+  platform: MusicPlatform,
+  field: SearchField,
+): Promise<SearchResponse> {
+  const params = new URLSearchParams({ q: query, platform, field });
   const response = await fetch(`${API_BASE}/search?${params}`);
   if (!response.ok) throw new Error('Search failed');
   return response.json() as Promise<SearchResponse>;

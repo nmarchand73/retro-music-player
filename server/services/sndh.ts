@@ -1,13 +1,26 @@
 import * as cheerio from 'cheerio';
-import type { Track } from '../types.js';
+import type { SearchField, Track } from '../types.js';
 
 const SNDH_BASE = 'https://sndh.atari.org';
 
-function parseRow($: cheerio.CheerioAPI, row: cheerio.Element): Track | null {
+function extractGameLabel(title: string, notes?: string): string | undefined {
+  const haystack = `${title} ${notes ?? ''}`.toLowerCase();
+  if (!/(game|soundtrack|from the game|from the release)/i.test(haystack)) return undefined;
+  const fromGame = (notes ?? '').match(/from (?:the )?game(?: of the same name)?[:\s]+([^.;]+)/i);
+  if (fromGame?.[1]) return fromGame[1].trim();
+  return title.trim() || undefined;
+}
+
+function isGameTrack(track: Track): boolean {
+  const haystack = `${track.title} ${track.notes ?? ''} ${track.game ?? ''}`.toLowerCase();
+  return /(game|soundtrack|from the game|from the release)/i.test(haystack);
+}
+
+function parseRow($: cheerio.CheerioAPI, row: cheerio.Element, artistOverride?: string): Track | null {
   const cells = $(row).find('td');
   if (cells.length < 4) return null;
 
-  let titleLink = cells.find('a[href^="/?ID="], a[href^="?ID="]').first();
+  const titleLink = cells.find('a[href^="/?ID="], a[href^="?ID="]').first();
   if (!titleLink.length) return null;
 
   const href = titleLink.attr('href');
@@ -17,7 +30,7 @@ function parseRow($: cheerio.CheerioAPI, row: cheerio.Element): Track | null {
   const id = idMatch[1];
   const title = titleLink.text().trim();
   const artistLink = cells.find('a[href*="p=composer"]').first();
-  const artist = artistLink.text().trim() || 'Unknown';
+  const artist = artistOverride ?? (artistLink.text().trim() || 'Unknown');
   const notes = cells.last().text().trim();
 
   return {
@@ -28,57 +41,98 @@ function parseRow($: cheerio.CheerioAPI, row: cheerio.Element): Track | null {
     artist,
     format: 'SNDH',
     notes: notes && notes !== title && notes !== artist ? notes : undefined,
+    game: extractGameLabel(title, notes),
     streamUrl: `/api/stream/sndh/${id}`,
     detailUrl: `${SNDH_BASE}/?ID=${id}`,
   };
 }
 
-function parseSearchResults(html: string): Track[] {
+function parseSearchResults(html: string, artistOverride?: string): Track[] {
   const $ = cheerio.load(html);
   const tracks: Track[] = [];
 
   $('table tr').each((_, row) => {
-    const track = parseRow($, row);
+    const track = parseRow($, row, artistOverride);
     if (track) tracks.push(track);
   });
 
   return tracks;
 }
 
-export async function searchSndh(query: string): Promise<Track[]> {
+function filterByField(tracks: Track[], query: string, field: SearchField): Track[] {
+  const q = query.trim().toLowerCase();
+
+  return tracks.filter((track) => {
+    if (!q) {
+      return field === 'game' ? isGameTrack(track) : true;
+    }
+
+    const title = track.title.toLowerCase();
+    const artist = track.artist.toLowerCase();
+    const notes = (track.notes ?? '').toLowerCase();
+    const game = (track.game ?? '').toLowerCase();
+
+    switch (field) {
+      case 'author':
+        return artist.includes(q);
+      case 'title':
+        return title.includes(q);
+      case 'game':
+        return (
+          title.includes(q) ||
+          game.includes(q) ||
+          notes.includes(q) ||
+          (isGameTrack(track) && (title.includes(q) || notes.includes(q) || game.includes(q)))
+        );
+      case 'any':
+      default:
+        return title.includes(q) || artist.includes(q) || notes.includes(q) || game.includes(q);
+    }
+  });
+}
+
+async function fetchHtml(path: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(`${SNDH_BASE}${path}`, {
+    ...init,
+    headers: {
+      'User-Agent': 'RetroMusicPlayer/1.0',
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!response.ok) return '';
+  return response.text();
+}
+
+export async function searchSndh(query: string, field: SearchField = 'any'): Promise<Track[]> {
   if (!query.trim()) {
-    return fetchRecentSndh();
+    const recent = parseSearchResults(await fetchHtml('/'));
+    return filterByField(recent, query, field).slice(0, 20);
+  }
+
+  if (field === 'author') {
+    const composerHtml = await fetchHtml(`/?p=composer&name=${encodeURIComponent(query)}`);
+    const composerTracks = parseSearchResults(composerHtml, query);
+    if (composerTracks.length > 0) {
+      return composerTracks.slice(0, 25);
+    }
   }
 
   const body = new URLSearchParams({ searchword: query });
-  const response = await fetch(`${SNDH_BASE}/?p=searchdone`, {
+  const html = await fetchHtml('/?p=searchdone', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'RetroMusicPlayer/1.0',
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
 
-  if (!response.ok) return [];
-  return parseSearchResults(await response.text()).slice(0, 25);
-}
-
-async function fetchRecentSndh(): Promise<Track[]> {
-  const response = await fetch(`${SNDH_BASE}/`, {
-    headers: { 'User-Agent': 'RetroMusicPlayer/1.0' },
-  });
-  if (!response.ok) return [];
-  return parseSearchResults(await response.text()).slice(0, 20);
+  const tracks = parseSearchResults(html);
+  return filterByField(tracks, query, field).slice(0, 25);
 }
 
 export async function getSndhTrack(id: string): Promise<Track | null> {
-  const response = await fetch(`${SNDH_BASE}/?ID=${id}`, {
-    headers: { 'User-Agent': 'RetroMusicPlayer/1.0' },
-  });
-  if (!response.ok) return null;
+  const html = await fetchHtml(`/?ID=${id}`);
+  if (!html) return null;
 
-  const $ = cheerio.load(await response.text());
+  const $ = cheerio.load(html);
   const title = $('h2').first().text().trim() || $('title').text().replace('SNDH Atari ST YM2149 collection', '').trim();
   const composerLink = $('a[href*="p=composer"]').first();
   const artist = composerLink.text().trim() || 'Unknown';

@@ -5,12 +5,14 @@ import { PlayerBar } from './components/PlayerBar';
 import { TrackerVisualizer } from './components/TrackerVisualizer';
 import { TrackList } from './components/TrackList';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
-import type { DatabaseInfo, MusicPlatform, Track } from './types';
+import type { DatabaseInfo, MusicPlatform, SearchField, Track } from './types';
+import { SEARCH_FIELD_LABELS, SEARCH_FIELD_PLACEHOLDERS } from './types';
 import './App.css';
 
 function App() {
   const [query, setQuery] = useState('');
   const [platform, setPlatform] = useState<MusicPlatform>('all');
+  const [field, setField] = useState<SearchField>('any');
   const [tracks, setTracks] = useState<Track[]>([]);
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,17 +20,20 @@ function App() {
 
   const player = useMusicPlayer();
 
-  const runSearch = useCallback(async (searchQuery: string, searchPlatform: MusicPlatform) => {
-    setLoading(true);
-    try {
-      const result = await searchTracks(searchQuery, searchPlatform);
-      setTracks(result.tracks);
-    } catch {
-      setTracks([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const runSearch = useCallback(
+    async (searchQuery: string, searchPlatform: MusicPlatform, searchField: SearchField) => {
+      setLoading(true);
+      try {
+        const result = await searchTracks(searchQuery, searchPlatform, searchField);
+        setTracks(result.tracks);
+      } catch {
+        setTracks([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     fetchDatabases()
@@ -36,12 +41,12 @@ function App() {
       .catch(() => setDatabases([]))
       .finally(() => setDbLoading(false));
 
-    runSearch('', 'all');
+    runSearch('', 'all', 'any');
   }, [runSearch]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    runSearch(query, platform);
+    runSearch(query, platform, field);
   };
 
   const currentTrackId = player.currentTrack
@@ -62,10 +67,17 @@ function App() {
         <form className="search-form" onSubmit={handleSubmit}>
           <input
             type="search"
-            placeholder="Search titles, artists, composers…"
+            placeholder={SEARCH_FIELD_PLACEHOLDERS[field]}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
+          <select value={field} onChange={(event) => setField(event.target.value as SearchField)}>
+            {Object.entries(SEARCH_FIELD_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
           <select value={platform} onChange={(event) => setPlatform(event.target.value as MusicPlatform)}>
             <option value="all">All platforms</option>
             <option value="amiga">Amiga</option>
@@ -87,6 +99,7 @@ function App() {
           tracks={tracks}
           loading={loading}
           currentTrackId={currentTrackId}
+          searchField={field}
           onPlay={player.playTrack}
         />
       </main>

@@ -1,5 +1,7 @@
 export type MusicPlatform = 'amiga' | 'atari' | 'all';
 
+export type SearchField = 'any' | 'author' | 'game' | 'title';
+
 export type TrackSource = 'modarchive' | 'sndh' | 'local';
 
 export interface Track {
@@ -12,6 +14,7 @@ export interface Track {
   sizeBytes?: number;
   channels?: number;
   genre?: string;
+  game?: string;
   notes?: string;
   timestamp?: string;
   streamUrl: string;
@@ -21,6 +24,7 @@ export interface Track {
 export interface SearchResponse {
   query: string;
   platform: MusicPlatform;
+  field: SearchField;
   total: number;
   tracks: Track[];
   sources: {
