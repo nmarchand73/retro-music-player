@@ -26,21 +26,33 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('tab', { name: 'Top Games' })).toBeVisible();
     await page.getByRole('tab', { name: 'Top Games' }).click();
     await expect(page.getByRole('heading', { name: 'Top Games' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Lemon' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'AtariM' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Music' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Taddei' })).toBeVisible();
-    await page.getByRole('button', { name: 'Search game Last Ninja in AtariM' }).click();
+    await expect(page.getByRole('heading', { name: 'Amiga', level: 3 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Atari ST', level: 3 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'CPC', exact: true, level: 3 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'C64', exact: true, level: 3 })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Best games' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Best music' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Best music' }).click();
+    await expect(page.getByText(/Best Classic Computer Game Music/i).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Search game Wizball from C64 music Top 100' }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Wizball');
+    await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
+
+    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('tab', { name: 'Best games' }).click();
+    await page.getByRole('button', { name: 'Search game Swiv from Atari ST Top 100' }).click();
     await expect(page.getByRole('combobox', { name: 'Search field' })).toHaveValue('game');
-    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Last Ninja');
+    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('SWIV');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
     await expect(page.getByRole('checkbox', { name: 'Playable only' })).not.toBeChecked();
     await expect(page.getByRole('heading', { name: 'Library Results' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Play Last Ninja/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Play SWIV/i }).first()).toBeVisible();
 
     await page.getByRole('tab', { name: 'Top Games' }).click();
-    await page.getByRole('button', { name: 'Search game The Chaos Engine in Lemon' }).click();
+    await page.getByRole('button', { name: 'Search game The Chaos Engine from Amiga Top 100', exact: true }).click();
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('The Chaos Engine');
+    await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
     await expect(
       page
         .locator('.track-list li')
@@ -49,6 +61,17 @@ test.describe('Local SNDH library golden path', () => {
         .first(),
     ).toBeVisible();
 
+    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('button', { name: 'Search game Robocop from CPC Top 100' }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('RoboCop');
+    await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
+
+    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('button', { name: 'Search game The Last Ninja from C64 Top 100' }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Last Ninja');
+    await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
+
+    await page.getByRole('combobox', { name: 'Platform' }).selectOption('all');
     await page.getByRole('combobox', { name: 'Search field' }).selectOption('any');
     await page.getByRole('searchbox', { name: 'Search music' }).fill('ninja mad');
     await page.getByRole('button', { name: 'Search', exact: true }).click();

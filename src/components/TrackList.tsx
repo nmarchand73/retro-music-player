@@ -3,10 +3,13 @@ import type { PlayerStatus } from '../hooks/useMusicPlayer';
 import type { LibrarySearch, SearchField, Track } from '../types';
 import { SEARCH_FIELD_LABELS } from '../types';
 import {
-  TOP_GAMES,
-  RANK_SOURCES,
-  type RankSourceId,
-  type TopGamePlatform,
+  RANKINGS_META,
+  MUSIC_RANKINGS_META,
+  platformColumnsFor,
+  topEntriesFor,
+  type PlatformColumn,
+  type RankingKind,
+  type TopGame,
 } from '../data/topGames';
 import { formatTitleDuration } from '../utils/formatTime';
 import { SORT_LABELS, type SortKey } from '../utils/sortTracks';
@@ -16,6 +19,8 @@ import { InsightsPanel } from './InsightsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { TrackCover } from './TrackCover';
 import type { MachineId, MachineSettings } from '../utils/machines';
+import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
+import type { FxPreviewTracks } from '../hooks/useFxPreviewTracks';
 
 export type LibraryView = 'library' | 'bookmarks' | 'top-games' | 'insights' | 'settings';
 
@@ -42,6 +47,12 @@ interface TrackListProps {
   onToggleMachine: (id: MachineId) => void;
   onEnableAllMachines: () => void;
   machinesParam: string;
+  audioFx: AudioFxSettings;
+  onAudioFxEnabled: (enabled: boolean) => void;
+  onAudioFxPreset: (preset: FxPreset) => void;
+  onAudioFxAmount: (amount: number) => void;
+  fxPreviewTracks: FxPreviewTracks;
+  fxPreviewLoading: boolean;
 }
 
 function platformLabel(platform: Track['platform']): string {
@@ -61,98 +72,78 @@ function platformLabel(platform: Track['platform']): string {
   }
 }
 
-function topGamePlatformLabel(platform: TopGamePlatform): string {
-  switch (platform) {
-    case 'amiga':
-      return 'AM';
-    case 'atari':
-      return 'ST';
-    default: {
-      const _exhaustive: never = platform;
-      throw new Error(`Unhandled top-game platform: ${_exhaustive}`);
-    }
-  }
+function platformSortRank(game: TopGame, column: PlatformColumn): number {
+  return game.ranks[column.rankKey] ?? 900;
 }
 
-function gameInSource(game: (typeof TOP_GAMES)[number], source: RankSourceId): boolean {
-  switch (source) {
-    case 'lemon':
-      return game.ranks.lemon != null;
-    case 'atarimania':
-      return game.ranks.atarimania != null;
-    case 'eab':
-      return game.ranks.eab != null;
-    case 'taddei':
-      return game.lists.includes('taddei');
-    default: {
-      const _exhaustive: never = source;
-      throw new Error(`Unhandled rank source: ${_exhaustive}`);
-    }
-  }
-}
+function gamesForPlatform(entries: TopGame[], column: PlatformColumn, needle: string) {
+  const rows = entries
+    .filter((game) => game.platforms.includes(column.id) && game.ranks[column.rankKey] != null)
+    .map((game) => ({ game }));
 
-function sourceRank(game: (typeof TOP_GAMES)[number], source: RankSourceId): number | undefined {
-  switch (source) {
-    case 'lemon':
-      return game.ranks.lemon;
-    case 'atarimania':
-      return game.ranks.atarimania;
-    case 'eab':
-      return game.ranks.eab;
-    case 'taddei':
-      return undefined;
-    default: {
-      const _exhaustive: never = source;
-      throw new Error(`Unhandled rank source: ${_exhaustive}`);
-    }
-  }
-}
-
-function gamesForSource(source: RankSourceId, needle: string) {
-  const rows = TOP_GAMES.filter((game) => gameInSource(game, source)).map((game) => ({ game }));
-
-  switch (source) {
-    case 'lemon':
-      rows.sort((a, b) => (a.game.ranks.lemon ?? 999) - (b.game.ranks.lemon ?? 999));
-      break;
-    case 'atarimania':
-      rows.sort((a, b) => (a.game.ranks.atarimania ?? 999) - (b.game.ranks.atarimania ?? 999));
-      break;
-    case 'eab':
-      rows.sort((a, b) => (a.game.ranks.eab ?? 999) - (b.game.ranks.eab ?? 999));
-      break;
-    case 'taddei':
-      rows.sort((a, b) => a.game.title.localeCompare(b.game.title));
-      break;
-    default: {
-      const _exhaustive: never = source;
-      throw new Error(`Unhandled rank source: ${_exhaustive}`);
-    }
-  }
+  rows.sort((a, b) => {
+    const rankDelta = platformSortRank(a.game, column) - platformSortRank(b.game, column);
+    if (rankDelta !== 0) return rankDelta;
+    return a.game.title.localeCompare(b.game.title);
+  });
 
   if (!needle) return rows;
-  return rows.filter(({ game }) => game.title.toLowerCase().includes(needle));
+  return rows.filter(
+    ({ game }) =>
+      game.title.toLowerCase().includes(needle) ||
+      game.searchQuery.toLowerCase().includes(needle),
+  );
 }
 
 function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void }) {
   const [filter, setFilter] = useState('');
+  const [kind, setKind] = useState<RankingKind>('games');
   const needle = filter.trim().toLowerCase();
+  const columnsDef = platformColumnsFor(kind);
+  const entries = topEntriesFor(kind);
 
   const columns = useMemo(
     () =>
-      RANK_SOURCES.map((source) => ({
-        source,
-        games: gamesForSource(source.id, needle),
+      columnsDef.map((column) => ({
+        column,
+        games: gamesForPlatform(entries, column, needle),
       })),
-    [needle],
+    [columnsDef, entries, needle],
   );
+
+  const headerBlurb =
+    kind === 'music'
+      ? `${MUSIC_RANKINGS_META.title} — click a title to search all platforms`
+      : `Official Top 100 games per machine — click a title to search all platforms${
+          RANKINGS_META.generatedAt ? ` · lists from ${RANKINGS_META.generatedAt}` : ''
+        }`;
 
   return (
     <>
       <header className="panel-header top-games-header">
         <div>
           <h2>Top Games</h2>
-          <p className="muted">Lemon, AtariM, Music (EAB), and Taddei — click to search by game</p>
+          <p className="muted">{headerBlurb}</p>
+          <div className="top-games-kind" role="tablist" aria-label="Ranking type">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={kind === 'games'}
+              className={kind === 'games' ? 'is-active' : undefined}
+              onClick={() => setKind('games')}
+            >
+              Best games
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={kind === 'music'}
+              className={kind === 'music' ? 'is-active' : undefined}
+              onClick={() => setKind('music')}
+            >
+              Best music
+            </button>
+          </div>
         </div>
         <label className="search-select top-games-filter">
           <span>Filter lists</span>
@@ -166,56 +157,63 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
         </label>
       </header>
       <div className="top-games-columns">
-        {columns.map(({ source, games }) => (
+        {columns.map(({ column, games }) => (
           <section
-            key={source.id}
-            className={`top-games-column source-${source.id}`}
-            aria-labelledby={`top-games-${source.id}`}
+            key={`${kind}-${column.id}`}
+            className={`top-games-column source-${column.id}`}
+            aria-labelledby={`top-games-${kind}-${column.id}`}
           >
             <header className="top-games-column-header">
-              <h3 id={`top-games-${source.id}`}>{source.short}</h3>
+              <h3 id={`top-games-${kind}-${column.id}`}>{column.short}</h3>
               <p className="muted">
-                {source.mode === 'list' ? 'A–Z list' : 'Ranked'} · {games.length}
+                <a
+                  className="top-games-source-link"
+                  href={column.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={[column.method, column.note].filter(Boolean).join(' — ')}
+                >
+                  {column.label}
+                </a>
+                {' · '}
+                {games.length}
               </p>
             </header>
             <ul className="top-games-list">
               {games.map(({ game }, index) => {
-                const rank = sourceRank(game, source.id);
-                const displayRank = source.mode === 'ranked' && rank != null ? rank : index + 1;
+                const rank = game.ranks[column.rankKey];
+                const displayRank = rank != null ? rank : index + 1;
+                const searchDiffers =
+                  game.searchQuery.toLowerCase() !== game.title.toLowerCase();
+                const listLabel = kind === 'music' ? 'music Top 100' : 'Top 100';
                 return (
-                  <li key={game.title}>
+                  <li key={`${kind}-${column.id}-${displayRank}-${game.title}`}>
                     <button
                       type="button"
                       className="top-game-row"
-                      aria-label={`Search game ${game.title} in ${source.short}`}
+                      aria-label={`Search game ${game.title} from ${column.short} ${listLabel}`}
+                      title={
+                        searchDiffers
+                          ? `${game.title} → search “${game.searchQuery}”`
+                          : game.title
+                      }
                       onClick={() =>
                         onSearch({
-                          query: game.title,
+                          query: game.searchQuery,
                           field: 'game',
                           platform: 'all',
                         })
                       }
                     >
-                      <span className="top-game-rank">
-                        {source.mode === 'list' ? '·' : String(displayRank).padStart(3, '0')}
-                      </span>
-                      <span className="top-game-main">
-                        <span className="top-game-title">{game.title}</span>
-                        <span className="top-game-badges">
-                          {game.platforms.map((entry) => (
-                            <span key={entry} className="chip" data-platform={entry}>
-                              {topGamePlatformLabel(entry)}
-                            </span>
-                          ))}
-                        </span>
-                      </span>
+                      <span className="top-game-rank">{String(displayRank).padStart(3, '0')}</span>
+                      <span className="top-game-title">{game.title}</span>
                     </button>
                   </li>
                 );
               })}
             </ul>
             {games.length === 0 ? (
-              <p className="empty-search">No matches in {source.short}.</p>
+              <p className="empty-search">No matches in {column.short}.</p>
             ) : null}
           </section>
         ))}
@@ -297,6 +295,12 @@ export function TrackList({
   onToggleMachine,
   onEnableAllMachines,
   machinesParam,
+  audioFx,
+  onAudioFxEnabled,
+  onAudioFxPreset,
+  onAudioFxAmount,
+  fxPreviewTracks,
+  fxPreviewLoading,
 }: TrackListProps) {
   const activeItemRef = useRef<HTMLLIElement | null>(null);
 
@@ -404,7 +408,21 @@ export function TrackList({
     return (
       <section className="panel track-panel settings-panel">
         {tabs}
-        <SettingsPanel machines={machines} onToggle={onToggleMachine} onEnableAll={onEnableAllMachines} />
+        <SettingsPanel
+          machines={machines}
+          onToggle={onToggleMachine}
+          onEnableAll={onEnableAllMachines}
+          audioFx={audioFx}
+          onAudioFxEnabled={onAudioFxEnabled}
+          onAudioFxPreset={onAudioFxPreset}
+          onAudioFxAmount={onAudioFxAmount}
+          previewTracks={fxPreviewTracks}
+          previewLoading={fxPreviewLoading}
+          currentTrackId={currentTrackId}
+          playerStatus={playerStatus}
+          playbackDuration={playbackDuration ?? 0}
+          onActivate={onActivate}
+        />
       </section>
     );
   }

@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import initYm2149, { Ym2149Player } from 'ym2149-wasm';
 import type { Track } from '../types';
 import { absoluteStreamUrl } from '../api';
+import {
+  AudioFxBus,
+  createAnalyser,
+  DEFAULT_AUDIO_FX_SETTINGS,
+  wirePlaybackGraph,
+  type AudioFxSettings,
+  type FxPlatformHint,
+} from '../lib/audioFxBus';
 import { SidPlayer } from '../lib/sidPlayer';
 import { TrackerPlayer } from '../lib/trackerPlayer';
 import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
@@ -99,7 +107,7 @@ function toTrackerSong(meta: { song?: TrackerSong } | undefined): TrackerSong | 
   return meta.song as TrackerSong;
 }
 
-export function useMusicPlayer() {
+export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTINGS) {
   const [state, setState] = useState<PlayerState>({
     status: 'idle',
     currentTrack: null,
@@ -119,6 +127,9 @@ export function useMusicPlayer() {
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const fxBusRef = useRef<AudioFxBus | null>(null);
+  const fxSettingsRef = useRef(audioFx);
+  fxSettingsRef.current = audioFx;
   const ymPausedRef = useRef(false);
   const ymDurationRef = useRef<number | null>(null);
   const ymRateRef = useRef(50);
@@ -128,6 +139,44 @@ export function useMusicPlayer() {
   const endedRef = useRef(false);
   const onEndedRef = useRef<(() => void) | null>(null);
   const progressTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    fxBusRef.current?.applySettings(audioFx);
+  }, [audioFx]);
+
+  useEffect(
+    () => () => {
+      fxBusRef.current?.dispose();
+      fxBusRef.current = null;
+    },
+    [],
+  );
+
+  const ensureFxBus = useCallback((ctx: AudioContext) => {
+    if (!fxBusRef.current || fxBusRef.current.context !== ctx) {
+      fxBusRef.current?.dispose();
+      fxBusRef.current = new AudioFxBus(ctx);
+    }
+    fxBusRef.current.applySettings(fxSettingsRef.current);
+    return fxBusRef.current;
+  }, []);
+
+  const connectThroughFx = useCallback(
+    (source: AudioNode, ctx: AudioContext, hint: FxPlatformHint) => {
+      const bus = ensureFxBus(ctx);
+      bus.setPlatformHint(hint);
+      bus.applySettings(fxSettingsRef.current);
+      try {
+        bus.output.disconnect();
+      } catch {
+        // first connect
+      }
+      const analyser = createAnalyser(ctx);
+      wirePlaybackGraph(source, bus, analyser, ctx.destination);
+      return analyser;
+    },
+    [ensureFxBus],
+  );
 
   const clearProgressTimer = () => {
     if (progressTimerRef.current) {
@@ -184,7 +233,7 @@ export function useMusicPlayer() {
     endedRef.current = false;
   }, []);
 
-  const playSndh = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
+  const playSndh = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext, hint: FxPlatformHint) => {
     await ensureYmInit();
     const player = new Ym2149Player(new Uint8Array(arrayBuffer));
     ymPlayerRef.current = player;
@@ -207,12 +256,6 @@ export function useMusicPlayer() {
     ymSamplesOutRef.current = 0;
     ymOutputRateRef.current = YM_SAMPLE_RATE;
 
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.22;
-    analyser.minDecibels = -92;
-    analyser.maxDecibels = -18;
-
     const bufferSize = 2048;
     const scriptNode = ctx.createScriptProcessor(bufferSize, 0, 2);
     scriptNode.onaudioprocess = (event) => {
@@ -233,8 +276,7 @@ export function useMusicPlayer() {
       ymSamplesOutRef.current += samples.length;
     };
 
-    scriptNode.connect(analyser);
-    analyser.connect(ctx.destination);
+    const analyser = connectThroughFx(scriptNode, ctx, hint);
     ymNodeRef.current = scriptNode;
 
     progressTimerRef.current = window.setInterval(() => {
@@ -278,7 +320,7 @@ export function useMusicPlayer() {
     }, 200);
 
     setState((prev) => ({ ...prev, status: 'playing', duration: duration ?? 0, analyser }));
-  }, []);
+  }, [connectThroughFx]);
 
   const playWav = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
     const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
@@ -289,16 +331,9 @@ export function useMusicPlayer() {
     audio.preload = 'auto';
     audioElRef.current = audio;
 
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.22;
-    analyser.minDecibels = -92;
-    analyser.maxDecibels = -18;
-
     const source = ctx.createMediaElementSource(audio);
     mediaSourceRef.current = source;
-    source.connect(analyser);
-    analyser.connect(ctx.destination);
+    const analyser = connectThroughFx(source, ctx, 'amiga');
 
     audio.ontimeupdate = () => {
       setState((prev) => ({
@@ -328,7 +363,7 @@ export function useMusicPlayer() {
       trackerPlayback: null,
       analyser,
     }));
-  }, []);
+  }, [connectThroughFx]);
 
   const playSid = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext, track: Track) => {
     const player = new SidPlayer();
@@ -371,7 +406,14 @@ export function useMusicPlayer() {
       }));
     });
 
-    const analyser = await player.play(arrayBuffer, ctx, track.durationSeconds);
+    const bus = ensureFxBus(ctx);
+    const analyser = await player.play(
+      arrayBuffer,
+      ctx,
+      track.durationSeconds,
+      bus,
+      fxSettingsRef.current,
+    );
     setState((prev) => ({
       ...prev,
       status: 'playing',
@@ -380,62 +422,57 @@ export function useMusicPlayer() {
       trackerPlayback: null,
       analyser,
     }));
-  }, []);
+  }, [ensureFxBus]);
 
   const playMod = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
     const player = new TrackerPlayer({ context: ctx });
     trackerRef.current = player;
     await player.init();
 
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.22;
-    analyser.minDecibels = -92;
-    analyser.maxDecibels = -18;
-
     if (player.processNode) {
       player.processNode.disconnect();
       player.gain.disconnect();
-      player.processNode.connect(analyser);
-      analyser.connect(player.gain);
-      player.gain.connect(ctx.destination);
+      const analyser = connectThroughFx(player.processNode, ctx, 'amiga');
+
+      await new Promise<void>((resolve, reject) => {
+        player.onMetadata((meta) => {
+          setState((prev) => ({
+            ...prev,
+            duration: Number(meta.dur ?? player.duration ?? 0),
+            trackerSong: toTrackerSong(meta as { song?: TrackerSong }),
+            analyser,
+          }));
+        });
+        player.onEnded(() => {
+          setState((prev) => ({
+            ...prev,
+            status: 'idle',
+            position: prev.duration,
+            trackerPlayback: null,
+          }));
+          onEndedRef.current?.();
+        });
+        player.onError(() => reject(new Error('Tracker playback failed')));
+        player.onProgress((progress) => {
+          setState((prev) => ({
+            ...prev,
+            position: progress.pos ?? player.getCurrentTime() ?? prev.position,
+            trackerPlayback: {
+              order: progress.order ?? 0,
+              pattern: progress.pattern ?? 0,
+              row: progress.row ?? 0,
+            },
+          }));
+        });
+        player.play(arrayBuffer);
+        setState((prev) => ({ ...prev, status: 'playing', analyser }));
+        resolve();
+      });
+      return;
     }
 
-    await new Promise<void>((resolve, reject) => {
-      player.onMetadata((meta) => {
-        setState((prev) => ({
-          ...prev,
-          duration: Number(meta.dur ?? player.duration ?? 0),
-          trackerSong: toTrackerSong(meta as { song?: TrackerSong }),
-          analyser,
-        }));
-      });
-      player.onEnded(() => {
-        setState((prev) => ({
-          ...prev,
-          status: 'idle',
-          position: prev.duration,
-          trackerPlayback: null,
-        }));
-        onEndedRef.current?.();
-      });
-      player.onError(() => reject(new Error('Tracker playback failed')));
-      player.onProgress((progress) => {
-        setState((prev) => ({
-          ...prev,
-          position: progress.pos ?? player.getCurrentTime() ?? prev.position,
-          trackerPlayback: {
-            order: progress.order ?? 0,
-            pattern: progress.pattern ?? 0,
-            row: progress.row ?? 0,
-          },
-        }));
-      });
-      player.play(arrayBuffer);
-      setState((prev) => ({ ...prev, status: 'playing', analyser }));
-      resolve();
-    });
-  }, []);
+    throw new Error('Tracker worklet failed to initialize');
+  }, [connectThroughFx]);
 
   const playTrack = useCallback(
     async (track: Track) => {
@@ -469,7 +506,11 @@ export function useMusicPlayer() {
           track.format.toUpperCase() === 'YM' ||
           track.platform === 'cpc'
         ) {
-          await playSndh(arrayBuffer, ctx);
+          const hint: FxPlatformHint =
+            track.platform === 'cpc' || track.format.toUpperCase() === 'YM' || track.format.toUpperCase() === 'AY'
+              ? 'cpc'
+              : 'atari';
+          await playSndh(arrayBuffer, ctx, hint);
           return;
         }
 

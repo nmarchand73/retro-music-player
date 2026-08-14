@@ -1,7 +1,12 @@
-/** Landmark Amiga + Atari ST games for quick soundtrack search. */
-export type TopGamePlatform = 'amiga' | 'atari';
+/** Top 100 game & music rankings across Amiga, Atari ST, CPC, and C64. */
+import gameRankings from './top100Rankings.json' with { type: 'json' };
+import musicRankings from './top100MusicRankings.json' with { type: 'json' };
 
-export type RankSourceId = 'lemon' | 'atarimania' | 'eab' | 'taddei';
+export type TopGamePlatform = 'amiga' | 'atari' | 'cpc' | 'c64';
+
+export type RankingKind = 'games' | 'music';
+
+export type RankSourceId = 'lemon' | 'atarimania' | 'cpc' | 'c64';
 
 export type RankSourceMode = 'ranked' | 'list';
 
@@ -11,286 +16,381 @@ export interface RankSource {
   short: string;
   /** ranked = numbered toplist; list = curated set without order. */
   mode: RankSourceMode;
+  url?: string;
+  method?: string;
+  note?: string;
 }
 
-export const RANK_SOURCES: RankSource[] = [
-  { id: 'lemon', label: 'Lemon Amiga toplist', short: 'Lemon', mode: 'ranked' },
-  { id: 'atarimania', label: 'Atarimania ST rating', short: 'AtariM', mode: 'ranked' },
-  {
-    id: 'eab',
-    label: 'English Amiga Board — best game music poll',
-    short: 'Music',
-    mode: 'ranked',
-  },
-  { id: 'taddei', label: 'David Taddei — Liste des jeux Amiga', short: 'Taddei', mode: 'list' },
-];
+/** Page columns — one official toplist per machine. */
+export interface PlatformColumn {
+  id: TopGamePlatform;
+  short: string;
+  label: string;
+  /** Primary rank key used for ordering in this column. */
+  rankKey: RankSourceId;
+  url: string;
+  method: string;
+  note: string;
+}
 
 export interface TopGame {
-  /** Label shown in the tab and used as the title search query. */
+  /** Official ranking title (shown in the list). */
   title: string;
+  /** Normalized query used for library search. */
+  searchQuery: string;
   platforms: TopGamePlatform[];
-  /** 1-based ranks from ordered sources (Lemon, Atarimania). */
-  ranks: Partial<Record<'lemon' | 'atarimania' | 'eab', number>>;
-  /** Membership in unordered curated lists (e.g. Taddei). */
-  lists: RankSourceId[];
+  /** 1-based ranks from ordered sources. */
+  ranks: Partial<Record<RankSourceId, number>>;
 }
 
-/**
- * Landmark Amiga / Atari ST titles with Lemon / Atarimania ranks,
- * EAB best-music poll ranks, and David Taddei’s unordered Amiga selection.
- */
-export const TOP_GAMES: TopGame[] = [
-  { title: 'Monkey Island', platforms: ['amiga', 'atari'], ranks: { lemon: 1, atarimania: 16, eab: 14 }, lists: ['taddei'] },
-  { title: 'Turrican 2', platforms: ['amiga', 'atari'], ranks: { lemon: 2, atarimania: 24, eab: 1 }, lists: ['taddei'] },
-  { title: 'Monkey Island 2', platforms: ['amiga'], ranks: { lemon: 3, eab: 29 }, lists: [] },
-  { title: 'Sensible World of Soccer', platforms: ['amiga'], ranks: { lemon: 4 }, lists: ['taddei'] },
-  { title: 'Lemmings', platforms: ['amiga', 'atari'], ranks: { lemon: 5, atarimania: 23, eab: 34 }, lists: ['taddei'] },
-  { title: 'The Settlers', platforms: ['amiga'], ranks: { lemon: 6, eab: 31 }, lists: ['taddei'] },
-  { title: 'Dune 2', platforms: ['amiga'], ranks: { lemon: 7 }, lists: ['taddei'] },
-  { title: 'Civilization', platforms: ['amiga', 'atari'], ranks: { lemon: 8, atarimania: 76 }, lists: [] },
-  { title: 'Formula One Grand Prix', platforms: ['amiga', 'atari'], ranks: { lemon: 9, atarimania: 63 }, lists: ['taddei'] },
-  { title: 'UFO Enemy Unknown', platforms: ['amiga'], ranks: { lemon: 10 }, lists: [] },
-  { title: 'Ambermoon', platforms: ['amiga'], ranks: { lemon: 11 }, lists: [] },
-  { title: 'Cannon Fodder', platforms: ['amiga'], ranks: { lemon: 12, eab: 13 }, lists: ['taddei'] },
-  { title: 'Wings', platforms: ['amiga'], ranks: { lemon: 13 }, lists: ['taddei'] },
-  { title: 'Indiana Jones and the Fate of Atlantis', platforms: ['amiga', 'atari'], ranks: { lemon: 14 }, lists: [] },
-  { title: 'Speedball 2', platforms: ['amiga', 'atari'], ranks: { lemon: 15, atarimania: 14, eab: 33 }, lists: ['taddei'] },
-  { title: 'Another World', platforms: ['amiga', 'atari'], ranks: { lemon: 16, atarimania: 21 }, lists: ['taddei'] },
-  { title: 'Flashback', platforms: ['amiga', 'atari'], ranks: { lemon: 17, atarimania: 22 }, lists: ['taddei'] },
-  { title: 'Pirates!', platforms: ['amiga', 'atari'], ranks: { lemon: 18, atarimania: 74 }, lists: ['taddei'] },
-  { title: 'Syndicate', platforms: ['amiga'], ranks: { lemon: 19 }, lists: ['taddei'] },
-  { title: 'Pinball Fantasies', platforms: ['amiga'], ranks: { lemon: 20, eab: 7 }, lists: [] },
-  { title: 'Worms', platforms: ['amiga'], ranks: { lemon: 21 }, lists: [] },
-  { title: 'Pinball Dreams', platforms: ['amiga'], ranks: { lemon: 22, eab: 3 }, lists: ['taddei'] },
-  { title: 'Simon the Sorcerer', platforms: ['amiga'], ranks: { lemon: 23 }, lists: [] },
-  { title: 'Lotus 2', platforms: ['amiga', 'atari'], ranks: { lemon: 24, atarimania: 61, eab: 4 }, lists: [] },
-  { title: 'Wing Commander', platforms: ['amiga'], ranks: { lemon: 25, eab: 50 }, lists: [] },
-  { title: 'Eye of the Beholder 2', platforms: ['amiga', 'atari'], ranks: { lemon: 26 }, lists: [] },
-  { title: 'The Chaos Engine', platforms: ['amiga', 'atari'], ranks: { lemon: 27, atarimania: 26, eab: 9 }, lists: ['taddei'] },
-  { title: 'Ruff n Tumble', platforms: ['amiga'], ranks: { lemon: 28 }, lists: ['taddei'] },
-  { title: 'Colonization', platforms: ['amiga'], ranks: { lemon: 29 }, lists: [] },
-  { title: 'It Came from the Desert', platforms: ['amiga', 'atari'], ranks: { lemon: 30, eab: 40 }, lists: ['taddei'] },
-  { title: 'Dragon Wars', platforms: ['amiga'], ranks: { lemon: 31 }, lists: [] },
-  { title: 'Battle Squadron', platforms: ['amiga'], ranks: { lemon: 32, eab: 11 }, lists: ['taddei'] },
-  { title: 'Dungeon Master', platforms: ['amiga', 'atari'], ranks: { lemon: 33, atarimania: 1 }, lists: [] },
-  { title: 'Lemmings 2', platforms: ['amiga', 'atari'], ranks: { lemon: 34 }, lists: [] },
-  { title: 'Indiana Jones and the Last Crusade', platforms: ['amiga', 'atari'], ranks: { lemon: 35, atarimania: 71 }, lists: ['taddei'] },
-  { title: 'Dyna Blaster', platforms: ['amiga'], ranks: { lemon: 36 }, lists: [] },
-  { title: 'IK+', platforms: ['amiga', 'atari'], ranks: { lemon: 37, atarimania: 15 }, lists: [] },
-  { title: 'Mega lo Mania', platforms: ['amiga', 'atari'], ranks: { lemon: 38 }, lists: ['taddei'] },
-  { title: 'Stunt Car Racer', platforms: ['amiga', 'atari'], ranks: { lemon: 39, atarimania: 2 }, lists: ['taddei'] },
-  { title: 'North and South', platforms: ['amiga'], ranks: { lemon: 40, atarimania: 77 }, lists: ['taddei'] },
-  { title: 'Rodland', platforms: ['amiga', 'atari'], ranks: { lemon: 41, atarimania: 55 }, lists: ['taddei'] },
-  { title: 'Maniac Mansion', platforms: ['amiga'], ranks: { lemon: 42, atarimania: 72 }, lists: [] },
-  { title: 'Banshee', platforms: ['amiga'], ranks: { lemon: 43 }, lists: [] },
-  { title: 'Beneath a Steel Sky', platforms: ['amiga'], ranks: { lemon: 44 }, lists: [] },
-  { title: 'Dune', platforms: ['amiga'], ranks: { lemon: 45, eab: 6 }, lists: ['taddei'] },
-  { title: 'Eye of the Beholder', platforms: ['amiga', 'atari'], ranks: { lemon: 46 }, lists: [] },
-  { title: 'F-19 Stealth Fighter', platforms: ['amiga', 'atari'], ranks: { lemon: 47, atarimania: 78 }, lists: [] },
-  { title: 'Turrican', platforms: ['amiga', 'atari'], ranks: { lemon: 48, atarimania: 65, eab: 8 }, lists: [] },
-  { title: 'Frontier', platforms: ['amiga', 'atari'], ranks: { lemon: 49, atarimania: 19 }, lists: ['taddei'] },
-  { title: 'Bubble Bobble', platforms: ['amiga', 'atari'], ranks: { lemon: 50, atarimania: 27 }, lists: [] },
-  { title: 'Lotus', platforms: ['amiga', 'atari'], ranks: { lemon: 51, atarimania: 12, eab: 28 }, lists: ['taddei'] },
-  { title: 'Pinball Illusions', platforms: ['amiga'], ranks: { lemon: 52, eab: 17 }, lists: [] },
-  { title: 'Populous 2', platforms: ['amiga', 'atari'], ranks: { lemon: 53, atarimania: 60 }, lists: [] },
-  { title: 'Super Cars 2', platforms: ['amiga', 'atari'], ranks: { lemon: 54, eab: 24 }, lists: ['taddei'] },
-  { title: 'Superfrog', platforms: ['amiga'], ranks: { lemon: 55, eab: 38 }, lists: ['taddei'] },
-  { title: 'Zak McKracken', platforms: ['amiga'], ranks: { lemon: 56, atarimania: 33 }, lists: [] },
-  { title: 'Sim City', platforms: ['amiga'], ranks: { lemon: 57, atarimania: 75 }, lists: ['taddei'] },
-  { title: 'Gunship 2000', platforms: ['amiga'], ranks: { lemon: 58 }, lists: [] },
-  { title: 'Lionheart', platforms: ['amiga'], ranks: { lemon: 59 }, lists: ['taddei'] },
-  { title: 'Agony', platforms: ['amiga'], ranks: { lemon: 60, eab: 5 }, lists: ['taddei'] },
-  { title: 'Apidya', platforms: ['amiga'], ranks: { lemon: 61, eab: 12 }, lists: ['taddei'] },
-  { title: 'Project-X', platforms: ['amiga'], ranks: { lemon: 62, eab: 30 }, lists: ['taddei'] },
-  { title: 'SWIV', platforms: ['amiga', 'atari'], ranks: { lemon: 63, atarimania: 64 }, lists: ['taddei'] },
-  { title: 'Xenon 2', platforms: ['amiga', 'atari'], ranks: { lemon: 64, atarimania: 13, eab: 21 }, lists: ['taddei'] },
-  { title: 'Gods', platforms: ['amiga', 'atari'], ranks: { lemon: 65, atarimania: 25, eab: 22 }, lists: ['taddei'] },
-  { title: 'Alien Breed', platforms: ['amiga'], ranks: { lemon: 66, eab: 19 }, lists: ['taddei'] },
-  { title: 'Alien Breed 2', platforms: ['amiga'], ranks: { lemon: 67 }, lists: [] },
-  { title: 'Zool', platforms: ['amiga', 'atari'], ranks: { lemon: 68 }, lists: [] },
-  { title: 'Kick Off 2', platforms: ['amiga', 'atari'], ranks: { lemon: 69, atarimania: 11 }, lists: ['taddei'] },
-  { title: 'Populous', platforms: ['amiga', 'atari'], ranks: { lemon: 70, atarimania: 6 }, lists: ['taddei'] },
-  { title: 'Powermonger', platforms: ['amiga', 'atari'], ranks: { lemon: 71, atarimania: 18 }, lists: ['taddei'] },
-  { title: 'Theme Park', platforms: ['amiga'], ranks: { lemon: 72 }, lists: [] },
-  { title: 'Hired Guns', platforms: ['amiga'], ranks: { lemon: 73, eab: 16 }, lists: [] },
-  { title: 'Captive', platforms: ['amiga', 'atari'], ranks: { lemon: 74 }, lists: ['taddei'] },
-  { title: 'Cadaver', platforms: ['amiga', 'atari'], ranks: { lemon: 75, atarimania: 32 }, lists: ['taddei'] },
-  { title: 'Exile', platforms: ['amiga', 'atari'], ranks: { lemon: 76 }, lists: ['taddei'] },
-  { title: 'Elite', platforms: ['amiga', 'atari'], ranks: { lemon: 77, atarimania: 5 }, lists: [] },
-  { title: 'Starglider 2', platforms: ['amiga', 'atari'], ranks: { lemon: 78, atarimania: 20 }, lists: ['taddei'] },
-  { title: 'Carrier Command', platforms: ['amiga', 'atari'], ranks: { lemon: 79, atarimania: 7 }, lists: [] },
-  { title: 'Captain Blood', platforms: ['amiga', 'atari'], ranks: { lemon: 80, atarimania: 30 }, lists: ['taddei'] },
-  { title: 'Elvira', platforms: ['amiga', 'atari'], ranks: { lemon: 81, atarimania: 31 }, lists: [] },
-  { title: 'Loom', platforms: ['amiga', 'atari'], ranks: { lemon: 82, atarimania: 73 }, lists: [] },
-  { title: 'Flight of the Amazon Queen', platforms: ['amiga'], ranks: { lemon: 83 }, lists: [] },
-  { title: 'Gobliiins', platforms: ['amiga', 'atari'], ranks: { lemon: 84 }, lists: [] },
-  { title: 'Discworld', platforms: ['amiga'], ranks: { lemon: 85 }, lists: [] },
-  { title: 'Jim Power', platforms: ['amiga', 'atari'], ranks: { lemon: 86, eab: 23 }, lists: ['taddei'] },
-  { title: 'First Samurai', platforms: ['amiga', 'atari'], ranks: { lemon: 87 }, lists: ['taddei'] },
-  { title: 'Second Samurai', platforms: ['amiga'], ranks: { lemon: 88 }, lists: [] },
-  { title: 'Body Blows', platforms: ['amiga'], ranks: { lemon: 89 }, lists: [] },
-  { title: 'Elfmania', platforms: ['amiga'], ranks: { lemon: 90 }, lists: ['taddei'] },
-  { title: 'Rainbow Islands', platforms: ['amiga', 'atari'], ranks: { lemon: 91, atarimania: 52 }, lists: ['taddei'] },
-  { title: 'Pang', platforms: ['amiga', 'atari'], ranks: { lemon: 92, atarimania: 53 }, lists: ['taddei'] },
-  { title: 'Toki', platforms: ['amiga', 'atari'], ranks: { lemon: 93, atarimania: 54 }, lists: ['taddei'] },
-  { title: 'Arabian Nights', platforms: ['amiga'], ranks: { lemon: 94 }, lists: [] },
-  { title: 'Wiz n Liz', platforms: ['amiga'], ranks: { lemon: 95 }, lists: [] },
-  { title: 'Putty', platforms: ['amiga'], ranks: { lemon: 96 }, lists: ['taddei'] },
-  { title: 'James Pond', platforms: ['amiga', 'atari'], ranks: { lemon: 97, atarimania: 56 }, lists: [] },
-  { title: 'The Lost Vikings', platforms: ['amiga'], ranks: { lemon: 98 }, lists: [] },
-  { title: 'Walker', platforms: ['amiga'], ranks: { lemon: 99 }, lists: [] },
-  { title: 'Leander', platforms: ['amiga'], ranks: { lemon: 100 }, lists: ['taddei'] },
-  { title: 'Oids', platforms: ['atari'], ranks: { atarimania: 3 }, lists: [] },
-  { title: 'Midwinter', platforms: ['amiga', 'atari'], ranks: { atarimania: 4 }, lists: [] },
-  { title: 'Hard Drivin', platforms: ['atari'], ranks: { atarimania: 8 }, lists: [] },
-  { title: 'Flight of the Intruder', platforms: ['amiga', 'atari'], ranks: { atarimania: 9 }, lists: [] },
-  { title: 'Silent Service', platforms: ['amiga', 'atari'], ranks: { atarimania: 10 }, lists: [] },
-  { title: 'Defender of the Crown', platforms: ['amiga', 'atari'], ranks: { atarimania: 17 }, lists: ['taddei'] },
-  { title: 'Gauntlet 2', platforms: ['amiga', 'atari'], ranks: { atarimania: 28 }, lists: [] },
-  { title: 'Rick Dangerous', platforms: ['amiga', 'atari'], ranks: { atarimania: 29 }, lists: ['taddei'] },
-  { title: 'Bards Tale', platforms: ['amiga', 'atari'], ranks: { atarimania: 34 }, lists: [] },
-  { title: 'New Zealand Story', platforms: ['amiga', 'atari'], ranks: { atarimania: 35 }, lists: [] },
-  { title: 'Great Giana Sisters', platforms: ['amiga', 'atari'], ranks: { atarimania: 36 }, lists: [] },
-  { title: 'Phantasie 3', platforms: ['amiga', 'atari'], ranks: { atarimania: 37 }, lists: [] },
-  { title: 'Ultima 5', platforms: ['amiga', 'atari'], ranks: { atarimania: 38 }, lists: [] },
-  { title: 'Chaos Strikes Back', platforms: ['amiga', 'atari'], ranks: { atarimania: 39 }, lists: [] },
-  { title: 'Gobliins 2', platforms: ['amiga', 'atari'], ranks: { atarimania: 40 }, lists: [] },
-  { title: 'Ultima 6', platforms: ['amiga', 'atari'], ranks: { atarimania: 41 }, lists: [] },
-  { title: 'Kings Quest 4', platforms: ['amiga', 'atari'], ranks: { atarimania: 42 }, lists: [] },
-  { title: 'Xenon', platforms: ['amiga', 'atari'], ranks: { atarimania: 43 }, lists: [] },
-  { title: 'Battletech', platforms: ['amiga', 'atari'], ranks: { atarimania: 44 }, lists: [] },
-  { title: 'International Karate', platforms: ['atari'], ranks: { atarimania: 45 }, lists: [] },
-  { title: 'Last Ninja', platforms: ['atari'], ranks: { atarimania: 46 }, lists: [] },
-  { title: 'Blood Money', platforms: ['amiga', 'atari'], ranks: { atarimania: 47, eab: 36 }, lists: [] },
-  { title: 'Vroom', platforms: ['amiga', 'atari'], ranks: { atarimania: 48 }, lists: ['taddei'] },
-  { title: 'No Second Prize', platforms: ['amiga', 'atari'], ranks: { atarimania: 49, eab: 47 }, lists: ['taddei'] },
-  { title: 'Lethal Xcess', platforms: ['amiga', 'atari'], ranks: { atarimania: 50 }, lists: [] },
-  { title: 'Wings of Death', platforms: ['amiga', 'atari'], ranks: { atarimania: 51, eab: 44 }, lists: [] },
-  { title: 'Menace', platforms: ['amiga', 'atari'], ranks: { atarimania: 57 }, lists: [] },
-  { title: 'Awesome', platforms: ['amiga', 'atari'], ranks: { atarimania: 58 }, lists: [] },
-  { title: 'Alcatraz', platforms: ['amiga', 'atari'], ranks: { atarimania: 59 }, lists: [] },
-  { title: 'Lotus 3', platforms: ['amiga'], ranks: { atarimania: 62, eab: 20 }, lists: [] },
-  { title: 'Shadow of the Beast', platforms: ['amiga', 'atari'], ranks: { atarimania: 66, eab: 2 }, lists: ['taddei'] },
-  { title: 'Midwinter 2', platforms: ['amiga', 'atari'], ranks: { atarimania: 67 }, lists: [] },
-  { title: 'Damocles', platforms: ['amiga', 'atari'], ranks: { atarimania: 68 }, lists: [] },
-  { title: 'Ishar', platforms: ['amiga', 'atari'], ranks: { atarimania: 69 }, lists: [] },
-  { title: 'Amberstar', platforms: ['amiga', 'atari'], ranks: { atarimania: 70 }, lists: [] },
-  { title: 'Gunship', platforms: ['amiga', 'atari'], ranks: { atarimania: 79 }, lists: [] },
-  { title: 'Falcon', platforms: ['amiga', 'atari'], ranks: { atarimania: 80 }, lists: [] },
-  { title: 'Starglider', platforms: ['amiga', 'atari'], ranks: { atarimania: 81 }, lists: [] },
-  { title: 'Warhead', platforms: ['amiga', 'atari'], ranks: { atarimania: 82 }, lists: [] },
-  { title: 'Virus', platforms: ['amiga', 'atari'], ranks: { atarimania: 83 }, lists: [] },
-  { title: 'Exolon', platforms: ['amiga', 'atari'], ranks: { atarimania: 84 }, lists: [] },
-  { title: 'Nebulus', platforms: ['amiga', 'atari'], ranks: { atarimania: 85 }, lists: [] },
-  { title: 'Arkanoid', platforms: ['amiga', 'atari'], ranks: { atarimania: 86 }, lists: [] },
-  { title: 'R-Type', platforms: ['amiga', 'atari'], ranks: { atarimania: 87 }, lists: [] },
-  { title: 'Operation Wolf', platforms: ['amiga', 'atari'], ranks: { atarimania: 88 }, lists: [] },
-  { title: 'After Burner', platforms: ['amiga', 'atari'], ranks: { atarimania: 89 }, lists: [] },
-  { title: 'OutRun', platforms: ['amiga', 'atari'], ranks: { atarimania: 90 }, lists: [] },
-  { title: 'Chase HQ', platforms: ['amiga', 'atari'], ranks: { atarimania: 91 }, lists: [] },
-  { title: 'Continental Circus', platforms: ['amiga', 'atari'], ranks: { atarimania: 92 }, lists: [] },
-  { title: 'Super Hang-On', platforms: ['amiga', 'atari'], ranks: { atarimania: 93 }, lists: [] },
-  { title: 'Power Drift', platforms: ['amiga', 'atari'], ranks: { atarimania: 94 }, lists: [] },
-  { title: 'Paperboy', platforms: ['amiga', 'atari'], ranks: { atarimania: 95 }, lists: [] },
-  { title: 'Gauntlet', platforms: ['amiga', 'atari'], ranks: { atarimania: 96 }, lists: [] },
-  { title: 'Marble Madness', platforms: ['amiga', 'atari'], ranks: { atarimania: 97 }, lists: ['taddei'] },
-  { title: 'Bomb Jack', platforms: ['amiga', 'atari'], ranks: { atarimania: 98 }, lists: [] },
-  { title: 'Ghosts n Goblins', platforms: ['amiga', 'atari'], ranks: { atarimania: 99 }, lists: [] },
-  { title: 'Pac-Mania', platforms: ['amiga', 'atari'], ranks: { atarimania: 100 }, lists: [] },
-  { title: 'Anarchy', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Assassin', platforms: ['amiga'], ranks: { eab: 48 }, lists: [] },
-  { title: 'Ork', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Uridium 2', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Cannon Fodder 2', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Brutal Football', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Sensible Soccer', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Shadow of the Beast 2', platforms: ['amiga', 'atari'], ranks: { eab: 25 }, lists: [] },
-  { title: 'Shadow of the Beast 3', platforms: ['amiga'], ranks: { eab: 32 }, lists: [] },
-  { title: 'Turrican 3', platforms: ['amiga'], ranks: { eab: 18 }, lists: [] },
-  { title: 'Pinball Mania', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Alien Breed Tower Assault', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Project X SE', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Apidya 2', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Battle Isle', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'History Line', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Utopia', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Global Domination', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Detroit', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Oil Imperium', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Port', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'The Patrician', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: '1869', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Merchant Colony', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Heimdall', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Heimdall 2', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Legend', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Black Crypt', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Isharia', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Ishar 2', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Ishar 3', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Realms of Arkania', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Curse of Enchantia', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Knightmare', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Bloodwych', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Captive 2 Liberation', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Laser Squad', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Rebelstar', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Laser Squad 2', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'X-COM', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Space Hulk', platforms: ['amiga'], ranks: {}, lists: [] },
-  { title: 'Epic', platforms: ['amiga', 'atari'], ranks: {}, lists: ['taddei'] },
-  { title: 'Millennium 2.2', platforms: ['amiga', 'atari'], ranks: {}, lists: [] },
-  { title: 'Advantage Tennis', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'The Adventures of Robin Hood', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Barbarian 2', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'B.A.T.', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Batman the Movie', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Benefactor', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Castle Master', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Cruise for a Corpse', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Darkmere', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Dark Seed', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Deliverance', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Desert Strike', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Disposable Hero', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Drakkhen', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Dreamweb', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Extase', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'F/A-18 Interceptor', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'The Faery Tale Adventure', platforms: ['amiga'], ranks: { eab: 49 }, lists: ['taddei'] },
-  { title: 'Fire and Ice', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Flood', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'The Godfather', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Golden Axe', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Great Courts 2', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Hunter', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'James Pond 2', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Magic Pockets', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Maupiti Island', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Moonstone', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Operation Stealth', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Prince of Persia', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Robocop 3', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Soccer Kid', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Teenage Queen', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Universe', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Unreal', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Les Voyageurs du Temps', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Wizkid', platforms: ['amiga'], ranks: {}, lists: ['taddei'] },
-  { title: 'Hybris', platforms: ['amiga'], ranks: { eab: 10 }, lists: [] },
-  { title: 'Jaguar XJ220', platforms: ['amiga', 'atari'], ranks: { eab: 15 }, lists: [] },
-  { title: 'Twintris', platforms: ['amiga'], ranks: { eab: 26 }, lists: [] },
-  { title: 'Harlequin', platforms: ['amiga'], ranks: { eab: 27 }, lists: [] },
-  { title: 'X-Out', platforms: ['amiga', 'atari'], ranks: { eab: 35 }, lists: [] },
-  { title: 'Fury of the Furries', platforms: ['amiga'], ranks: { eab: 37 }, lists: [] },
-  { title: 'Yo Joe!', platforms: ['amiga'], ranks: { eab: 39 }, lists: [] },
-  { title: 'LED Storm', platforms: ['amiga', 'atari'], ranks: { eab: 41 }, lists: [] },
-  { title: 'Perihelion', platforms: ['amiga'], ranks: { eab: 42 }, lists: [] },
-  { title: 'Super Cars', platforms: ['amiga', 'atari'], ranks: { eab: 43 }, lists: [] },
-  { title: '9 Lives', platforms: ['amiga'], ranks: { eab: 45 }, lists: [] },
-  { title: 'Astaroth', platforms: ['amiga'], ranks: { eab: 46 }, lists: [] },
-];
+type GameJsonPlatformKey = keyof typeof gameRankings.platforms;
+type MusicJsonPlatformKey = keyof typeof musicRankings.lists;
 
-if (TOP_GAMES.length !== 249) {
-  throw new Error(`TOP_GAMES must contain 249 entries, got ${TOP_GAMES.length}`);
+const GAME_JSON_KEY: Record<TopGamePlatform, GameJsonPlatformKey> = {
+  amiga: 'AMIGA',
+  atari: 'ATARI_ST',
+  cpc: 'AMSTRAD_CPC',
+  c64: 'C64',
+};
+
+const MUSIC_JSON_KEY: Record<TopGamePlatform, MusicJsonPlatformKey> = {
+  amiga: 'AMIGA',
+  atari: 'ATARI_ST',
+  cpc: 'AMSTRAD_CPC',
+  c64: 'C64',
+};
+
+const RANK_KEY: Record<TopGamePlatform, RankSourceId> = {
+  amiga: 'lemon',
+  atari: 'atarimania',
+  cpc: 'cpc',
+  c64: 'c64',
+};
+
+const COLUMN_SHORT: Record<TopGamePlatform, string> = {
+  amiga: 'Amiga',
+  atari: 'Atari ST',
+  cpc: 'CPC',
+  c64: 'C64',
+};
+
+/** Exact official titles → library-friendly search strings. */
+const SEARCH_ALIASES: Record<string, string> = {
+  'The Secret of Monkey Island': 'Monkey Island',
+  "Monkey Island 2: LeChuck's Revenge": 'Monkey Island 2',
+  'Monkey Island 2': 'Monkey Island 2',
+  'Turrican II: The Final Fight': 'Turrican 2',
+  'Turrican II: The Final Fight (2022)': 'Turrican 2',
+  'Turrican II - The Final Fight': 'Turrican 2',
+  'Turrican II': 'Turrican 2',
+  'Turrican 3': 'Turrican 3',
+  'Speedball 2: Brutal Deluxe': 'Speedball 2',
+  'Speedball II - Brutal Deluxe': 'Speedball 2',
+  'Speedball 2': 'Speedball 2',
+  'Dune II: The Battle for Arrakis': 'Dune 2',
+  'Dune II': 'Dune 2',
+  'UFO: Enemy Unknown': 'UFO Enemy Unknown',
+  'UFO: Enemy Unknown (AGA)': 'UFO Enemy Unknown',
+  'UFO: Enemy Unknown (OCS/ECS)': 'UFO Enemy Unknown',
+  "Sensible World of Soccer '96/'97": 'Sensible World of Soccer',
+  "Sensible World of Soccer '95/'96": 'Sensible World of Soccer',
+  'Sensible World of Soccer v1.1': 'Sensible World of Soccer',
+  'Lotus Turbo Challenge 2': 'Lotus 2',
+  'Lotus Esprit Turbo Challenge': 'Lotus',
+  'Lotus III: The Ultimate Challenge': 'Lotus 3',
+  'Lotus III': 'Lotus 3',
+  'Eye of the Beholder II: The Legend of Darkmoon': 'Eye of the Beholder 2',
+  'Eye of the Beholder II': 'Eye of the Beholder 2',
+  'Lemmings 2: The Tribes': 'Lemmings 2',
+  'Populous II: Trials of the Olympian Gods': 'Populous 2',
+  'Populous II': 'Populous 2',
+  'Super Cars II': 'Super Cars 2',
+  'Zak McKracken and the Alien Mindbenders': 'Zak McKracken',
+  'Ultima IV: Quest of the Avatar': 'Ultima IV',
+  'Ultima V: Warriors of Destiny': 'Ultima V',
+  'Ultima V - Warriors of Destiny': 'Ultima V',
+  'Ultima III: Exodus': 'Ultima III',
+  'Ultima VI - The False Prophet': 'Ultima VI',
+  'Last Ninja 2: Back with a Vengeance': 'Last Ninja 2',
+  'The Last Ninja': 'Last Ninja',
+  'Last Ninja 2': 'Last Ninja 2',
+  'Last Ninja 3': 'Last Ninja 3',
+  'Archon: The Light and the Dark': 'Archon',
+  "Ghosts 'n Goblins Arcade": 'Ghosts n Goblins Arcade',
+  "Ghosts 'n Goblins": 'Ghosts n Goblins',
+  "Ghosts'n Goblins": 'Ghosts n Goblins',
+  "Ghouls 'n Ghosts": 'Ghouls n Ghosts',
+  'Metal Warrior 4: Agents of Metal': 'Metal Warrior 4',
+  'Buck Rogers: Countdown to Doomsday': 'Buck Rogers',
+  'Sentinel Worlds I: Future Magic': 'Sentinel Worlds',
+  'World Class Leader Board': 'World Class Leaderboard',
+  'Bruce Lee II': 'Bruce Lee 2',
+  'Summer Games II': 'Summer Games 2',
+  'The Great Giana Sisters': 'Great Giana Sisters',
+  'The Legend of Blacksilver': 'Legend of Blacksilver',
+  'The Magic Candle': 'Magic Candle',
+  'The Way of the Exploding Fist': 'Way of the Exploding Fist',
+  "The Bard's Tale: Tales of the Unknown": "Bard's Tale",
+  "The Bard's Tale - Tales of the Unknown": "Bard's Tale",
+  'Might and Magic: Book Two - Gates to Another World': 'Might and Magic 2',
+  "Boulder Dash II: Rockford's Revenge": 'Boulder Dash 2',
+  'Enforcer: Fullmetal Megablaster': 'Enforcer',
+  "Knight 'n' Grail": 'Knight n Grail',
+  'Creatures 2: Torture Trouble': 'Creatures 2',
+  'Creatures II': 'Creatures 2',
+  'Cybernoid II': 'Cybernoid 2',
+  'Cybernoid II: The Revenge': 'Cybernoid 2',
+  'Arkanoid: Revenge of Doh': 'Arkanoid 2',
+  'Arkanoid II: Revenge of Doh': 'Arkanoid 2',
+  'Bad Dudes vs. DragonNinja': 'Dragon Ninja',
+  'Chase H.Q.': 'Chase HQ',
+  Robocop: 'RoboCop',
+  'Robocop 2': 'RoboCop 2',
+  'Le Manoir de Mortevielle': 'Mortville Manor',
+  'The Guild of Thieves': 'Guild of Thieves',
+  'Target: Renegade': 'Target Renegade',
+  'Target Renegade': 'Target Renegade',
+  'North & South': 'North and South',
+  "L'Arche du Captain Blood": 'Captain Blood',
+  'Crafton & Xunk': 'Get Dexter',
+  'Cauldron II': 'Cauldron 2',
+  'Saboteur!': 'Saboteur',
+  'Saboteur II': 'Saboteur 2',
+  'Match Day II': 'Match Day 2',
+  "Burnin' Rubber": 'Burnin Rubber',
+  'Crazy Cars III': 'Crazy Cars 3',
+  'Dizzy: The Ultimate Cartoon Adventure': 'Dizzy',
+  'Moonstone: A Hard Days Knight': 'Moonstone',
+  'Out of this World': 'Another World',
+  'Battle Squadron: The Destruction of the Barrax Empire': 'Battle Squadron',
+  "Worms: The Director's Cut": 'Worms',
+  'Alien Breed: Tower Assault': 'Alien Breed',
+  'Alien Breed II': 'Alien Breed 2',
+  "Championship Manager '93": 'Championship Manager',
+  'NightHawk F-117A Stealth Fighter 2.0': 'F-117A',
+  'Utopia: The Creation of a Nation': 'Utopia',
+  'Ishar 2: Messengers of Doom': 'Ishar 2',
+  'The Misadventures of Flink': 'Flink',
+  'Oh No! More Lemmings': 'Oh No More Lemmings',
+  'Die Siedler': 'The Settlers',
+  'Frontier: Elite II': 'Frontier',
+  'Frontier - Elite II': 'Frontier',
+  "Hard Drivin' II - Drive Harder": 'Hard Drivin 2',
+  'IK+ (International Karate +)': 'IK+',
+  'International Karate+': 'IK+',
+  'Xenon 2: Megablast': 'Xenon 2',
+  'Xenon II - Megablast': 'Xenon 2',
+  'R-Type II': 'R-Type 2',
+  'Gobliins II - The Prince Buffoon': 'Gobliins 2',
+  'Dungeon Master Expansion Set I - Chaos Strikes Back': 'Chaos Strikes Back',
+  "King's Quest IV - The Perils of Rosella": "King's Quest 4",
+  'Phantasie III - The Wrath of Nikademus': 'Phantasie 3',
+  'Twinworld - Land of Vision': 'Twinworld',
+  "Battletech - The Crescent Hawk's Inception": 'Battletech',
+  'Conflict - The Middle East Simulation': 'Conflict',
+  'Elvira - Mistress of the Dark': 'Elvira',
+  'SDI - Strategic Defence Initiative': 'SDI',
+  'Turbo Out Run': 'Turbo OutRun',
+  'Turbo OutRun': 'Turbo OutRun',
+  Swiv: 'SWIV',
+  'Rambo: First Blood Part II': 'Rambo',
+  'Rambo III': 'Rambo 3',
+  'Myth: History in the Making': 'Myth',
+  "Jeroen Tel's Eliminator": 'Eliminator',
+  'Batman: The Movie': 'Batman the Movie',
+  'Batman: The Caped Crusader': 'Batman Caped Crusader',
+  "Bitmap Brothers' Magic Pockets": 'Magic Pockets',
+  'Jim Power in Mutant Planet': 'Jim Power',
+  'Mega-lo-Mania': 'Mega lo Mania',
+  'Shadow of the Beast II': 'Shadow of the Beast 2',
+  'Shadow of the Beast III': 'Shadow of the Beast 3',
+  'Yo! Joe!': 'Yo Joe!',
+  'Fire & Ice': 'Fire and Ice',
+  'James Pond II: Codename RoboCod': 'James Pond 2',
+  'James Pond II': 'James Pond 2',
+  'Chuck Rock II': 'Chuck Rock 2',
+  'Goldrunner II': 'Goldrunner 2',
+  'Midwinter II': 'Midwinter 2',
+  'Switchblade II': 'Switchblade 2',
+  'Agent X II': 'Agent X 2',
+  'Fist II': 'Fist 2',
+  'Ace II': 'Ace 2',
+  'Airwolf II': 'Airwolf 2',
+  'Ghostbusters II': 'Ghostbusters 2',
+  'Prehistorik II': 'Prehistorik 2',
+  'Sacred Armour of Antiriad': 'Antiriad',
+  'The Sacred Armour of Antiriad': 'Antiriad',
+  'The New Zealand Story': 'New Zealand Story',
+  'Cadaver: The Payoff': 'Cadaver',
+  'Rod-Land': 'Rodland',
+  'Bonanza Bros.': 'Bonanza Bros',
+  'Dynablaster': 'Dyna Blaster',
+  'Skate or Die!': 'Skate or Die',
+  "Flimbo's Quest": 'Flimbos Quest',
+  "Hunter's Moon": 'Hunters Moon',
+  'One Man and His Droid': 'One Man and his Droid',
+  'H.A.T.E.': 'HATE',
+  'HeroQuest': 'Hero Quest',
+  "Solomon's Key": "Solomon's Key",
+  "Daley Thompson's Olympic Challenge": 'Daley Thompson Olympic Challenge',
+  "Daley Thompson's Supertest": 'Daley Thompson Supertest',
+  'The Seven Gates of Jambala': 'Seven Gates of Jambala',
+  "Leavin' Teramis": 'Leavin Teramis',
+  'Z-Out': 'Z-Out',
+  'Cybercon III': 'Cybercon 3',
+  'Killing Game Show': 'Killing Game Show',
+  'OutRun Europa': 'OutRun Europa',
+  'OutRun': 'OutRun',
+  'Last V8': 'Last V8',
+  'Delta Man': 'Delta',
+  'Ocean Loader': 'Ocean Loader',
+  'Get Dexter': 'Get Dexter',
+  'Get Dexter 2': 'Get Dexter 2',
+  'Sorcery+': 'Sorcery+',
+};
+
+function stripEditionSuffix(title: string): string {
+  return title
+    .replace(/\s*\((?:AGA|ECS|OCS|OCS\/ECS|CD32|cartridge|\d{4})\)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Build a library search query from an official ranking title. */
+export function rankingSearchQuery(title: string): string {
+  const exact = SEARCH_ALIASES[title];
+  if (exact) return exact;
+  const stripped = stripEditionSuffix(title);
+  if (stripped !== title) {
+    const alias = SEARCH_ALIASES[stripped];
+    if (alias) return alias;
+    return rankingSearchQuery(stripped);
+  }
+  return title;
+}
+
+function buildGamePlatformColumns(): PlatformColumn[] {
+  return (Object.keys(GAME_JSON_KEY) as TopGamePlatform[]).map((id) => {
+    const block = gameRankings.platforms[GAME_JSON_KEY[id]];
+    const fullName = block.source.name;
+    const label = fullName.includes(' / ') ? fullName.split(' / ')[0]! : fullName;
+    return {
+      id,
+      short: COLUMN_SHORT[id],
+      label,
+      rankKey: RANK_KEY[id],
+      url: block.source.url,
+      method: block.source.method,
+      note: [fullName !== label ? fullName : null, block.source.note].filter(Boolean).join(' — '),
+    };
+  });
+}
+
+function buildMusicPlatformColumns(): PlatformColumn[] {
+  return (Object.keys(MUSIC_JSON_KEY) as TopGamePlatform[]).map((id) => {
+    const block = musicRankings.lists[MUSIC_JSON_KEY[id]];
+    return {
+      id,
+      short: COLUMN_SHORT[id],
+      label: block.primary_reference,
+      rankKey: RANK_KEY[id],
+      url: block.source,
+      method: musicRankings.methodology,
+      note: `${musicRankings.title} — ${block.primary_reference}`,
+    };
+  });
+}
+
+export const PLATFORM_COLUMNS: PlatformColumn[] = buildGamePlatformColumns();
+export const MUSIC_PLATFORM_COLUMNS: PlatformColumn[] = buildMusicPlatformColumns();
+
+export function platformColumnsFor(kind: RankingKind): PlatformColumn[] {
+  switch (kind) {
+    case 'games':
+      return PLATFORM_COLUMNS;
+    case 'music':
+      return MUSIC_PLATFORM_COLUMNS;
+    default: {
+      const _exhaustive: never = kind;
+      throw new Error(`Unhandled ranking kind: ${_exhaustive}`);
+    }
+  }
+}
+
+export const RANK_SOURCES: RankSource[] = PLATFORM_COLUMNS.map((column) => ({
+  id: column.rankKey,
+  label: column.label,
+  short: column.short,
+  mode: 'ranked' as const,
+  url: column.url,
+  method: column.method,
+  note: column.note,
+}));
+
+export const RANKINGS_META = {
+  generatedAt: gameRankings.generated_at,
+  description: gameRankings.description,
+};
+
+export const MUSIC_RANKINGS_META = {
+  title: musicRankings.title,
+  methodology: musicRankings.methodology,
+};
+
+function buildFromGameRankings(): TopGame[] {
+  const byKey = new Map<string, TopGame>();
+
+  for (const platform of Object.keys(GAME_JSON_KEY) as TopGamePlatform[]) {
+    const block = gameRankings.platforms[GAME_JSON_KEY[platform]];
+    const rankKey = RANK_KEY[platform];
+    for (const entry of block.games) {
+      const searchQuery = rankingSearchQuery(entry.title);
+      const key = `${platform}::${entry.rank}::${entry.title.toLowerCase()}`;
+      byKey.set(key, {
+        title: entry.title,
+        searchQuery,
+        platforms: [platform],
+        ranks: { [rankKey]: entry.rank },
+      });
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+function buildFromMusicRankings(): TopGame[] {
+  const byKey = new Map<string, TopGame>();
+
+  for (const platform of Object.keys(MUSIC_JSON_KEY) as TopGamePlatform[]) {
+    const block = musicRankings.lists[MUSIC_JSON_KEY[platform]];
+    const rankKey = RANK_KEY[platform];
+    for (const entry of block.games) {
+      const searchQuery = rankingSearchQuery(entry.game);
+      const key = `music::${platform}::${entry.rank}::${entry.game.toLowerCase()}`;
+      byKey.set(key, {
+        title: entry.game,
+        searchQuery,
+        platforms: [platform],
+        ranks: { [rankKey]: entry.rank },
+      });
+    }
+  }
+
+  return [...byKey.values()];
+}
+
+export const TOP_GAMES: TopGame[] = buildFromGameRankings();
+export const TOP_MUSIC: TopGame[] = buildFromMusicRankings();
+
+export function topEntriesFor(kind: RankingKind): TopGame[] {
+  switch (kind) {
+    case 'games':
+      return TOP_GAMES;
+    case 'music':
+      return TOP_MUSIC;
+    default: {
+      const _exhaustive: never = kind;
+      throw new Error(`Unhandled ranking kind: ${_exhaustive}`);
+    }
+  }
 }

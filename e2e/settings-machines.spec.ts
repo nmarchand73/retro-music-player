@@ -34,4 +34,54 @@ test.describe('Machine settings defaults', () => {
       timeout: 20_000,
     });
   });
+
+  test('settings Modern sound toggle persists amount and preset', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.removeItem('retro-music-player:audio-fx'));
+    await page.reload();
+
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Listening' })).toBeVisible();
+
+    const modern = page.getByRole('checkbox', { name: 'Modern sound' });
+    await expect(modern).not.toBeChecked();
+    await modern.check();
+    await expect(modern).toBeChecked();
+
+    const preset = page.getByRole('combobox', { name: 'Audio FX preset' });
+    await expect(preset).toBeEnabled();
+    await preset.selectOption('hall');
+    await expect(preset).toHaveValue('hall');
+
+    const amount = page.getByRole('slider', { name: 'Modern sound amount' });
+    await amount.fill('80');
+    await expect(page.getByText(/Amount · 80%/)).toBeVisible();
+
+    await page.reload();
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('checkbox', { name: 'Modern sound' })).toBeChecked();
+    await expect(page.getByRole('combobox', { name: 'Audio FX preset' })).toHaveValue('hall');
+    await expect(page.getByText(/Amount · 80%/)).toBeVisible();
+  });
+
+  test('settings Listening samples play one track per platform', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Settings' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Try a sample' })).toBeVisible();
+    const samples = page.getByRole('list', { name: 'FX preview samples' });
+    await expect(samples).toBeVisible({ timeout: 20_000 });
+
+    await expect(samples.getByRole('button', { name: /Play Last Ninja \(Atari ST\)/i })).toBeVisible();
+    await expect(samples.getByRole('button', { name: /Play k8 \(Amiga\)/i })).toBeVisible();
+    await expect(samples.getByRole('button', { name: /Play Robocop \(Amstrad CPC\)/i })).toBeVisible();
+    await expect(samples.getByRole('button', { name: /Play Commando \(Commodore 64\)/i })).toBeVisible();
+
+    await page.getByRole('checkbox', { name: 'Modern sound' }).check();
+    await samples.getByRole('button', { name: /Play Last Ninja \(Atari ST\)/i }).click();
+    await expect(samples.getByRole('button', { name: /Pause Last Ninja \(Atari ST\)/i })).toBeVisible({
+      timeout: 30_000,
+    });
+  });
 });

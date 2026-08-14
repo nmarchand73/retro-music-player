@@ -4,9 +4,11 @@ import { DatabasePanel } from './components/DatabasePanel';
 import { PlayerBar } from './components/PlayerBar';
 import { TrackerVisualizer } from './components/TrackerVisualizer';
 import { TrackList, type LibraryView } from './components/TrackList';
-import { useMusicPlayer } from './hooks/useMusicPlayer';
-import { useBookmarks } from './hooks/useBookmarks';
 import { useMachineSettings } from './hooks/useMachineSettings';
+import { useAudioFxSettings } from './hooks/useAudioFxSettings';
+import { useBookmarks } from './hooks/useBookmarks';
+import { useFxPreviewTracks } from './hooks/useFxPreviewTracks';
+import { useMusicPlayer } from './hooks/useMusicPlayer';
 import type { DatabaseInfo, LibrarySearch, MusicPlatform, SearchField, Track } from './types';
 import { SEARCH_FIELD_LABELS, SEARCH_FIELD_PLACEHOLDERS } from './types';
 import { sortTracks, type SortKey } from './utils/sortTracks';
@@ -29,10 +31,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(true);
   const { machines, toggleMachine, enableAll } = useMachineSettings();
+  const { audioFx, setEnabled: setAudioFxEnabled, setPreset: setAudioFxPreset, setAmount: setAudioFxAmount } =
+    useAudioFxSettings();
+  const { tracks: fxPreviewTracks, loading: fxPreviewLoading } = useFxPreviewTracks();
   const activeMachines = useMemo(() => enabledMachines(machines), [machines]);
   const machinesParam = useMemo(() => machinesQueryValue(machines), [machines]);
 
-  const player = useMusicPlayer();
+  const player = useMusicPlayer(audioFx);
   const { bookmarks, isBookmarked, toggleBookmark, patchBookmark } = useBookmarks();
   const tracksRef = useRef(tracks);
   const currentRef = useRef(player.currentTrack);
@@ -339,6 +344,12 @@ function App() {
           onToggleMachine={toggleMachine}
           onEnableAllMachines={enableAll}
           machinesParam={machinesParam}
+          audioFx={audioFx}
+          onAudioFxEnabled={setAudioFxEnabled}
+          onAudioFxPreset={setAudioFxPreset}
+          onAudioFxAmount={setAudioFxAmount}
+          fxPreviewTracks={fxPreviewTracks}
+          fxPreviewLoading={fxPreviewLoading}
         />
       </main>
 

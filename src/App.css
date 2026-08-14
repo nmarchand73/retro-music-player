@@ -423,6 +423,32 @@ select:focus-visible,
   align-items: start;
 }
 
+.top-games-kind {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.top-games-kind button {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+}
+
+.top-games-kind button.is-active,
+.top-games-kind button[aria-selected='true'] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 16%, var(--panel));
+}
+
 .top-games-filter {
   min-width: 12rem;
 }
@@ -461,37 +487,51 @@ select:focus-visible,
 }
 
 .top-games-column-header {
-  padding: 0.65rem 0.75rem 0.5rem;
+  padding: 0.4rem 0.55rem 0.35rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
 }
 
 .top-games-column-header h3 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .top-games-column-header .muted {
-  margin: 0.2rem 0 0;
-  font-size: 0.78rem;
+  margin: 0.1rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.top-games-column.source-lemon .top-games-column-header h3 {
+.top-games-source-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.top-games-source-link:hover {
+  color: var(--text);
+}
+
+.top-games-column.source-amiga .top-games-column-header h3 {
   color: var(--amiga);
 }
 
-.top-games-column.source-atarimania .top-games-column-header h3 {
+.top-games-column.source-atari .top-games-column-header h3 {
   color: var(--accent);
 }
 
-.top-games-column.source-taddei .top-games-column-header h3 {
-  color: #6b5210;
+.top-games-column.source-cpc .top-games-column-header h3 {
+  color: var(--cpc);
 }
 
-.top-games-column.source-eab .top-games-column-header h3 {
-  color: color-mix(in srgb, var(--ink) 70%, var(--amiga));
+.top-games-column.source-c64 .top-games-column-header h3 {
+  color: var(--c64);
 }
 
 .top-games-list {
@@ -506,18 +546,19 @@ select:focus-visible,
 .top-game-row {
   width: 100%;
   display: grid;
-  grid-template-columns: 2.4rem minmax(0, 1fr);
-  gap: 0.55rem;
-  align-items: center;
-  padding: 0.45rem 0.55rem;
+  grid-template-columns: 1.85rem minmax(0, 1fr);
+  gap: 0.35rem;
+  align-items: baseline;
+  padding: 0.18rem 0.45rem;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   background: transparent;
   color: var(--ink);
   text-align: left;
   cursor: pointer;
   font: inherit;
-  transition: background 0.16s ease;
+  line-height: 1.25;
+  transition: background 0.12s ease;
 }
 
 .top-game-row:hover {
@@ -526,41 +567,20 @@ select:focus-visible,
 
 .top-game-rank {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.top-game-main {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
 .top-game-title {
-  font-family: var(--font-display);
-  font-size: 1.02rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.top-game-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-.top-game-badges .chip[data-platform='amiga'] {
-  border-color: color-mix(in srgb, var(--amiga) 35%, var(--border));
-  color: var(--amiga);
-}
-
-.top-game-badges .chip[data-platform='atari'] {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-  color: var(--accent);
 }
 
 @media (max-width: 1200px) {
@@ -2366,6 +2386,10 @@ select:focus-visible,
   font-size: 0.62rem;
 }
 
+.settings-panel {
+  overflow: auto;
+}
+
 .settings-panel .settings-header {
   align-items: flex-start;
   gap: 1rem;
@@ -2441,6 +2465,104 @@ select:focus-visible,
 .settings-footnote {
   margin: 1rem 0 0;
   font-size: 0.9rem;
+}
+
+.settings-audio-fx {
+  margin: 0 0 1.4rem;
+  padding: 0 0 1.1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settings-section-heading {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-audio-fx h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-audio-fx > .muted {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.settings-fx-field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+}
+
+.settings-fx-field select,
+.settings-fx-field input[type='range'] {
+  width: min(100%, 22rem);
+}
+
+.settings-fx-field select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.settings-fx-field select:disabled,
+.settings-fx-field input[type='range']:disabled {
+  opacity: 0.55;
+}
+
+.settings-fx-previews {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.settings-fx-previews h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.settings-fx-previews > .muted {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.settings-fx-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.settings-fx-preview-row {
+  grid-template-columns: auto auto 1fr;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+}
+
+.settings-fx-preview-missing {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 900px) {

@@ -1,4 +1,10 @@
 import { SidAudioEngine } from 'libsidplayfp-wasm';
+import {
+  AudioFxBus,
+  createAnalyser,
+  wirePlaybackGraph,
+  type AudioFxSettings,
+} from './audioFxBus';
 
 /** Cycles to request per ScriptProcessor fill (~20 ms chunks from libsidplayfp). */
 const RENDER_CYCLES = 100_000;
@@ -39,6 +45,8 @@ export class SidPlayer {
     arrayBuffer: ArrayBuffer,
     ctx: AudioContext,
     durationSeconds?: number | null,
+    fxBus?: AudioFxBus | null,
+    fxSettings?: AudioFxSettings | null,
   ): Promise<AnalyserNode> {
     this.stop();
 
@@ -55,11 +63,7 @@ export class SidPlayer {
 
     await engine.loadSidBuffer(new Uint8Array(arrayBuffer));
 
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.22;
-    analyser.minDecibels = -92;
-    analyser.maxDecibels = -18;
+    const analyser = createAnalyser(ctx);
     this.analyser = analyser;
 
     const bufferSize = 2048;
@@ -115,8 +119,21 @@ export class SidPlayer {
       }
     };
 
-    scriptNode.connect(analyser);
-    analyser.connect(ctx.destination);
+    if (fxBus) {
+      if (fxSettings) {
+        fxBus.setPlatformHint('c64');
+        fxBus.applySettings(fxSettings);
+      }
+      try {
+        fxBus.output.disconnect();
+      } catch {
+        // first connect
+      }
+      wirePlaybackGraph(scriptNode, fxBus, analyser, ctx.destination);
+    } else {
+      scriptNode.connect(analyser);
+      analyser.connect(ctx.destination);
+    }
     this.node = scriptNode;
 
     this.progressTimer = window.setInterval(() => {
