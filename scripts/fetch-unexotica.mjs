@@ -25,9 +25,19 @@ const LETTERS = ["0-9", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")];
 const SKIP_CDDA = !process.argv.includes("--cdda");
 const FILTER = process.argv.find((arg) => arg.startsWith("--filter="))?.slice(9) ?? "";
 const DELAY_MS = 250;
+/** Hard ceiling for each Amiga .lha download attempt (request + fallback). */
+const DOWNLOAD_HARD_MS = 2000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withHardTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} hard-stopped after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function isLha(buf) {
@@ -142,13 +152,14 @@ async function waitVerified(page, url = "https://www.exotica.org.uk/wiki/UnExoti
   await page.waitForFunction(() => !/verifying/i.test(document.title), { timeout: 15000 });
 }
 
-async function requestBuffer(context, page, url) {
-  let response = await context.request.get(url, { timeout: 90000 });
+async function requestBuffer(context, page, url, timeoutMs = 90000, { allowVerify = true } = {}) {
+  let response = await context.request.get(url, { timeout: timeoutMs });
   let buf = Buffer.from(await response.body());
   const head = buf.toString("utf8", 0, 400);
   if (!isVerifyPage(head)) return buf;
+  if (!allowVerify) throw new Error("browser verify wall");
   await waitVerified(page);
-  response = await context.request.get(url, { timeout: 90000 });
+  response = await context.request.get(url, { timeout: timeoutMs });
   return Buffer.from(await response.body());
 }
 
@@ -198,38 +209,53 @@ async function downloadLha(context, filesPage, filelink, dest) {
     return false;
   }
   const url = archiveUrl(filelink);
-  try {
-    const buf = await requestBuffer(context, filesPage, url);
-    if (isLha(buf)) {
-      writeFileSync(dest, buf);
-      return true;
+  const started = Date.now();
+  const remaining = () => Math.max(1, DOWNLOAD_HARD_MS - (Date.now() - started));
+
+  const attempt = async () => {
+    try {
+      const buf = await requestBuffer(context, filesPage, url, remaining(), { allowVerify: false });
+      if (isLha(buf)) {
+        writeFileSync(dest, buf);
+        return true;
+      }
+    } catch {
+      // Fall through to a real navigation, which can pass the JS gate.
     }
-  } catch {
-    // Fall through to a real navigation, which can pass the JS gate.
-  }
-  const downloadPromise = filesPage.waitForEvent("download", { timeout: 60000 });
-  // Always settle so a failed goto cannot leave an unhandled rejection.
-  const ignoreDownload = downloadPromise.then(
-    () => undefined,
-    () => undefined,
-  );
-  try {
-    await filesPage.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
-    if (/verifying/i.test(await filesPage.title())) {
-      await filesPage.waitForFunction(() => !/verifying/i.test(document.title), { timeout: 15000 });
-      await filesPage.reload({ waitUntil: "domcontentloaded" });
+
+    const navTimeout = remaining();
+    const downloadPromise = filesPage.waitForEvent("download", { timeout: navTimeout });
+    // Always settle so a failed goto cannot leave an unhandled rejection.
+    const ignoreDownload = downloadPromise.then(
+      () => undefined,
+      () => undefined,
+    );
+    try {
+      await filesPage.goto(url, { waitUntil: "domcontentloaded", timeout: navTimeout });
+      // No verifying wait — hard 2s budget leaves no room for Cloudflare.
+      const download = await downloadPromise;
+      await download.saveAs(dest);
+    } catch (error) {
+      await ignoreDownload;
+      throw error;
     }
-    const download = await downloadPromise;
-    await download.saveAs(dest);
+    const saved = readFileSync(dest).subarray(0, 32);
+    if (!isLha(saved)) {
+      throw new Error(`not an LHA archive (${statSync(dest).size} bytes)`);
+    }
+    return true;
+  };
+
+  try {
+    return await withHardTimeout(attempt(), DOWNLOAD_HARD_MS, filelink.split("/").pop() || filelink);
   } catch (error) {
-    await ignoreDownload;
+    try {
+      await filesPage.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 1000 });
+    } catch {
+      // page may already be closed / navigating
+    }
     throw error;
   }
-  const saved = readFileSync(dest).subarray(0, 32);
-  if (!isLha(saved)) {
-    throw new Error(`not an LHA archive (${statSync(dest).size} bytes)`);
-  }
-  return true;
 }
 
 function isDirectImageUrl(url) {

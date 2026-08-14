@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { BookmarkButton } from './BookmarkButton';
+import { MarqueeText } from './MarqueeText';
 import { MiniSpectrum } from './MiniSpectrum';
 import { Spectrum3D } from './Spectrum3D';
 import { TrackCover } from './TrackCover';
@@ -7,6 +8,22 @@ import type { PlayerStatus } from '../hooks/useMusicPlayer';
 import type { Track } from '../types';
 import { formatClock, formatDuration } from '../utils/formatTime';
 
+function playerPlatformLabel(platform: Track['platform']): string {
+  switch (platform) {
+    case 'amiga':
+      return 'Amiga';
+    case 'atari':
+      return 'Atari ST';
+    case 'cpc':
+      return 'CPC';
+    case 'c64':
+      return 'C64';
+    default: {
+      const _exhaustive: never = platform;
+      throw new Error(`Unhandled platform: ${_exhaustive}`);
+    }
+  }
+}
 interface PlayerBarProps {
   track: Track | null;
   status: PlayerStatus;
@@ -103,10 +120,10 @@ export function PlayerBar({
         <div className="player-info">
           {track ? (
             <>
-              <TrackCover track={track} className="player-cover" />
+              <TrackCover track={track} className="player-cover" showPlaceholder={false} />
               <div className="player-copy">
                 <div className="player-title">
-                  <strong>{track.title}</strong>
+                  <MarqueeText text={track.title} className="player-title-label" />
                   {titleDuration && <span className="player-title-duration">{titleDuration}</span>}
                 </div>
                 <span className="player-artist">
@@ -157,24 +174,20 @@ export function PlayerBar({
 
       <div className="player-stage">
         <aside className="player-stage-side">
-          <div className={`player-stage-art${playing ? ' is-live' : ''}`}>
-            <div className="player-art-glow" aria-hidden="true" />
-            <div className="player-art-frame">
-              {track ? (
-                <TrackCover track={track} className="player-cover-hero" />
-              ) : (
-                <span className="player-cover-hero is-placeholder" aria-hidden="true">
-                  ?
-                </span>
-              )}
+          {track?.coverUrl ? (
+            <div className={`player-stage-art${playing ? ' is-live' : ''}`}>
+              <div className="player-art-glow" aria-hidden="true" />
+              <div className="player-art-frame">
+                <TrackCover track={track} className="player-cover-hero" showPlaceholder={false} />
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="player-hud-meta">
             {track ? (
               <>
                 <div className="player-title">
-                  <strong>{track.title}</strong>
+                  <MarqueeText text={track.title} className="player-title-label" />
                   <BookmarkButton title={track.title} bookmarked={bookmarked} onToggle={onToggleBookmark} />
                 </div>
                 {titleDuration && <span className="player-title-duration">{titleDuration}</span>}
@@ -185,7 +198,7 @@ export function PlayerBar({
                 </span>
                 {track.platform ? (
                   <span className="player-platform-chip" data-platform={track.platform}>
-                    {track.platform === 'amiga' ? 'Amiga' : 'Atari ST'}
+                    {playerPlatformLabel(track.platform)}
                   </span>
                 ) : null}
               </>

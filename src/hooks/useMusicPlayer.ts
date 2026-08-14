@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import initYm2149, { Ym2149Player } from 'ym2149-wasm';
 import type { Track } from '../types';
 import { absoluteStreamUrl } from '../api';
+import { SidPlayer } from '../lib/sidPlayer';
 import { TrackerPlayer } from '../lib/trackerPlayer';
 import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
 import { parseSndhTiming } from '../utils/sndhTiming';
@@ -112,6 +113,7 @@ export function useMusicPlayer() {
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackerRef = useRef<TrackerPlayer | null>(null);
+  const sidPlayerRef = useRef<SidPlayer | null>(null);
   const ymPlayerRef = useRef<Ym2149Player | null>(null);
   const ymNodeRef = useRef<ScriptProcessorNode | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
@@ -141,6 +143,11 @@ export function useMusicPlayer() {
     if (trackerRef.current) {
       trackerRef.current.stop();
       trackerRef.current = null;
+    }
+
+    if (sidPlayerRef.current) {
+      sidPlayerRef.current.stop();
+      sidPlayerRef.current = null;
     }
 
     if (ymNodeRef.current) {
@@ -323,6 +330,58 @@ export function useMusicPlayer() {
     }));
   }, []);
 
+  const playSid = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext, track: Track) => {
+    const player = new SidPlayer();
+    sidPlayerRef.current = player;
+    endedRef.current = false;
+
+    player.setOnEnded(() => {
+      if (endedRef.current) return;
+      endedRef.current = true;
+      setState((prev) => ({
+        ...prev,
+        status: 'idle',
+        position: prev.duration || prev.position,
+        trackerPlayback: null,
+      }));
+      onEndedRef.current?.();
+    });
+    player.setOnProgress((position, duration) => {
+      const capped =
+        duration > 0 ? Math.min(position, duration) : position;
+      if (duration > 0 && position >= duration) {
+        if (!endedRef.current) {
+          endedRef.current = true;
+          player.pause();
+          setState((prev) => ({
+            ...prev,
+            position: capped,
+            duration,
+            status: 'idle',
+          }));
+          onEndedRef.current?.();
+        }
+        return;
+      }
+      setState((prev) => ({
+        ...prev,
+        position: capped,
+        duration: duration > 0 ? duration : prev.duration,
+        status: 'playing',
+      }));
+    });
+
+    const analyser = await player.play(arrayBuffer, ctx, track.durationSeconds);
+    setState((prev) => ({
+      ...prev,
+      status: 'playing',
+      duration: track.durationSeconds ?? 0,
+      trackerSong: null,
+      trackerPlayback: null,
+      analyser,
+    }));
+  }, []);
+
   const playMod = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
     const player = new TrackerPlayer({ context: ctx });
     trackerRef.current = player;
@@ -404,8 +463,22 @@ export function useMusicPlayer() {
         audioContextRef.current = ctx;
         if (ctx.state === 'suspended') await ctx.resume();
 
-        if (track.format.toUpperCase() === 'SNDH') {
+        if (
+          track.format.toUpperCase() === 'SNDH' ||
+          track.format.toUpperCase() === 'AY' ||
+          track.format.toUpperCase() === 'YM' ||
+          track.platform === 'cpc'
+        ) {
           await playSndh(arrayBuffer, ctx);
+          return;
+        }
+
+        if (
+          track.format.toUpperCase() === 'SID' ||
+          track.platform === 'c64' ||
+          engine === 'sid'
+        ) {
+          await playSid(arrayBuffer, ctx, track);
           return;
         }
 
@@ -423,12 +496,17 @@ export function useMusicPlayer() {
         }));
       }
     },
-    [playMod, playSndh, playWav, stopAll],
+    [playMod, playSid, playSndh, playWav, stopAll],
   );
 
   const pause = useCallback(() => {
     if (trackerRef.current) {
       trackerRef.current.pause();
+      setState((prev) => ({ ...prev, status: 'paused' }));
+      return;
+    }
+    if (sidPlayerRef.current) {
+      sidPlayerRef.current.pause();
       setState((prev) => ({ ...prev, status: 'paused' }));
       return;
     }
@@ -447,6 +525,11 @@ export function useMusicPlayer() {
   const resume = useCallback(() => {
     if (trackerRef.current) {
       trackerRef.current.unpause();
+      setState((prev) => ({ ...prev, status: 'playing' }));
+      return;
+    }
+    if (sidPlayerRef.current) {
+      sidPlayerRef.current.resume();
       setState((prev) => ({ ...prev, status: 'playing' }));
       return;
     }
@@ -492,6 +575,24 @@ export function useMusicPlayer() {
         position: next,
         status: audio.paused ? 'paused' : 'playing',
       }));
+      return;
+    }
+
+    const sid = sidPlayerRef.current;
+    if (sid) {
+      const duration = sid.getDurationSeconds();
+      const next =
+        duration != null && duration > 0
+          ? Math.min(Math.max(0, seconds), duration)
+          : Math.max(0, seconds);
+      void sid.seekSeconds(next).then(() => {
+        endedRef.current = duration != null && next >= duration;
+        setState((prev) => ({
+          ...prev,
+          position: next,
+          status: endedRef.current ? 'idle' : 'playing',
+        }));
+      });
       return;
     }
 

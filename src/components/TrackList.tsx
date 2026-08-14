@@ -12,15 +12,19 @@ import { formatTitleDuration } from '../utils/formatTime';
 import { SORT_LABELS, type SortKey } from '../utils/sortTracks';
 import { trackKey } from '../utils/trackKey';
 import { BookmarkButton } from './BookmarkButton';
+import { InsightsPanel } from './InsightsPanel';
+import { SettingsPanel } from './SettingsPanel';
 import { TrackCover } from './TrackCover';
+import type { MachineId, MachineSettings } from '../utils/machines';
 
-export type LibraryView = 'library' | 'bookmarks' | 'top-games';
+export type LibraryView = 'library' | 'bookmarks' | 'top-games' | 'insights' | 'settings';
 
 interface TrackListProps {
   tracks: Track[];
   loading: boolean;
   currentTrackId: string | null;
   playerStatus: PlayerStatus;
+  playbackDuration?: number;
   searchField: SearchField;
   query: string;
   sort: SortKey;
@@ -34,6 +38,10 @@ interface TrackListProps {
   onToggleBookmark: (track: Track) => void;
   onActivate: (track: Track) => void;
   onSearch: (search: LibrarySearch) => void;
+  machines: MachineSettings;
+  onToggleMachine: (id: MachineId) => void;
+  onEnableAllMachines: () => void;
+  machinesParam: string;
 }
 
 function platformLabel(platform: Track['platform']): string {
@@ -42,6 +50,10 @@ function platformLabel(platform: Track['platform']): string {
       return 'AMIGA';
     case 'atari':
       return 'ATARI';
+    case 'cpc':
+      return 'CPC';
+    case 'c64':
+      return 'C64';
     default: {
       const _exhaustive: never = platform;
       throw new Error(`Unhandled platform: ${_exhaustive}`);
@@ -251,6 +263,10 @@ function viewHeading(view: LibraryView): string {
       return 'Bookmarks';
     case 'top-games':
       return 'Top Games';
+    case 'insights':
+      return 'Insights';
+    case 'settings':
+      return 'Settings';
     default: {
       const _exhaustive: never = view;
       throw new Error(`Unhandled library view: ${_exhaustive}`);
@@ -263,6 +279,7 @@ export function TrackList({
   loading,
   currentTrackId,
   playerStatus,
+  playbackDuration = 0,
   searchField,
   query,
   sort,
@@ -276,6 +293,10 @@ export function TrackList({
   onToggleBookmark,
   onActivate,
   onSearch,
+  machines,
+  onToggleMachine,
+  onEnableAllMachines,
+  machinesParam,
 }: TrackListProps) {
   const activeItemRef = useRef<HTMLLIElement | null>(null);
 
@@ -309,10 +330,26 @@ export function TrackList({
       <button
         type="button"
         role="tab"
+        aria-selected={view === 'insights'}
+        onClick={() => onView('insights')}
+      >
+        Insights
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={view === 'bookmarks'}
         onClick={() => onView('bookmarks')}
       >
         Bookmarks{bookmarkCount > 0 ? ` (${bookmarkCount})` : ''}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === 'settings'}
+        onClick={() => onView('settings')}
+      >
+        Settings
       </button>
     </div>
   );
@@ -350,6 +387,24 @@ export function TrackList({
       <section className="panel track-panel">
         {tabs}
         <TopGamesPanel onSearch={onSearch} />
+      </section>
+    );
+  }
+
+  if (view === 'insights') {
+    return (
+      <section className="panel track-panel insights-panel">
+        {tabs}
+        <InsightsPanel onSearch={onSearch} machines={machines} machinesParam={machinesParam} />
+      </section>
+    );
+  }
+
+  if (view === 'settings') {
+    return (
+      <section className="panel track-panel settings-panel">
+        {tabs}
+        <SettingsPanel machines={machines} onToggle={onToggleMachine} onEnableAll={onEnableAllMachines} />
       </section>
     );
   }
@@ -403,7 +458,9 @@ export function TrackList({
           const active = currentTrackId === id;
           const playing = active && playerStatus === 'playing';
           const action = playing ? 'Pause' : active && playerStatus === 'paused' ? 'Resume' : 'Play';
-          const durationLabel = formatTitleDuration(track.durationSeconds);
+          const durationLabel = formatTitleDuration(
+            track.durationSeconds ?? (active && playbackDuration > 0 ? playbackDuration : null),
+          );
           const actionLabel = durationLabel ? `${action} ${track.title}, ${durationLabel}` : `${action} ${track.title}`;
           const bookmarked = isBookmarked(track);
           return (
@@ -422,23 +479,25 @@ export function TrackList({
                 >
                   {playing ? '❚❚' : '▶'}
                 </button>
-                {track.game ? (
-                  <button
-                    type="button"
-                    className="track-cover-button"
-                    aria-label={`Search game ${track.game}`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onSearch({ query: track.game ?? '', field: 'game' });
-                    }}
-                  >
-                    <TrackCover track={track} />
-                  </button>
-                ) : (
-                  <span className="track-cover-button is-static">
-                    <TrackCover track={track} />
-                  </span>
-                )}
+                {track.coverUrl ? (
+                  track.game ? (
+                    <button
+                      type="button"
+                      className="track-cover-button"
+                      aria-label={`Search game ${track.game}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSearch({ query: track.game ?? '', field: 'game' });
+                      }}
+                    >
+                      <TrackCover track={track} showPlaceholder={false} />
+                    </button>
+                  ) : (
+                    <span className="track-cover-button is-static">
+                      <TrackCover track={track} showPlaceholder={false} />
+                    </span>
+                  )
+                ) : null}
                 <SearchFacetButton
                   className="platform-badge"
                   label="platform"
@@ -466,16 +525,21 @@ export function TrackList({
                       onSearch={() => onSearch({ query: track.artist, field: 'author' })}
                     />
                     {track.year ? <span className="track-year"> · {track.year}</span> : null}
+                    {track.game ? (
+                      <>
+                        <span className="track-sep"> · </span>
+                        <SearchFacetButton
+                          className="track-game"
+                          label="game"
+                          value={track.game}
+                          onSearch={() => onSearch({ query: track.game ?? '', field: 'game' })}
+                        />
+                      </>
+                    ) : null}
+                    {track.notes && !track.game ? (
+                      <span className="track-notes"> · {track.notes}</span>
+                    ) : null}
                   </span>
-                  {track.game && (
-                    <SearchFacetButton
-                      className="track-game"
-                      label="game"
-                      value={track.game}
-                      onSearch={() => onSearch({ query: track.game ?? '', field: 'game' })}
-                    />
-                  )}
-                  {track.notes && !track.game && <span className="track-notes">{track.notes}</span>}
                 </span>
                 <span className="track-meta">
                   {active && (

@@ -3,14 +3,21 @@ import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { MiniSpectrum } from './MiniSpectrum';
 
-const BAR_COUNT = 48;
-const PEAK_HOLD_FRAMES = 20;
-const PEAK_FALL = 0.013;
+const BAR_COUNT = 40;
+const PEAK_HOLD_FRAMES = 18;
+const PEAK_FALL = 0.014;
 const FLOOR = 0.04;
 const ATTACK = 0.9;
 const RELEASE = 0.24;
-const MAX_HEIGHT = 2.35;
-const FRAME_PAD = 1.28;
+const MAX_HEIGHT = 2.7;
+const FRAME_PAD = 1.22;
+const BAR_SPACING = 0.26;
+const BAR_RADIUS = 0.098;
+const MAX_PIXEL_RATIO = 1.25;
+const IDLE_FPS = 12;
+/** Fixed low-res mirror RT — never scales with panel/DPR (was the Safari OOM trigger). */
+const REFLECTOR_WIDTH = 512;
+const REFLECTOR_HEIGHT = 256;
 
 interface Spectrum3DProps {
   analyser: AnalyserNode | null;
@@ -18,13 +25,17 @@ interface Spectrum3DProps {
   variant?: 'panel' | 'backdrop';
 }
 
-function groupBins(data: Uint8Array, groups: number): Float32Array {
-  const out = new Float32Array(groups);
-  const lo = 2;
-  const hi = Math.max(lo + 1, Math.floor(data.length * 0.72));
+const levelsScratch = new Float32Array(BAR_COUNT);
+const lerpA = new THREE.Color();
+const lerpB = new THREE.Color('#7a45e8');
+
+function groupBinsInto(data: Uint8Array, groups: number, out: Float32Array): void {
+  const lo = Math.max(5, Math.floor(data.length * 0.003));
+  const hi = Math.max(lo + 1, data.length - 1);
   const span = hi / lo;
 
   for (let i = 0; i < groups; i += 1) {
+    const t = i / Math.max(1, groups - 1);
     const start = Math.min(hi - 1, Math.floor(lo * Math.pow(span, i / groups)));
     const end = Math.min(hi, Math.max(start + 1, Math.floor(lo * Math.pow(span, (i + 1) / groups))));
     let peak = 0;
@@ -32,36 +43,95 @@ function groupBins(data: Uint8Array, groups: number): Float32Array {
       const v = data[j] ?? 0;
       if (v > peak) peak = v;
     }
-    out[i] = Math.pow(peak / 255, 1.1);
+    const gate = 14 + (1 - t) * 16;
+    if (peak < gate) {
+      out[i] = 0;
+      continue;
+    }
+    const shelf = 1 + t * 0.65;
+    out[i] = Math.min(1, Math.pow((peak - gate * 0.35) / 255, 1.05) * shelf);
   }
-  return out;
 }
 
 function mixBarColor(t: number, energy: number, out: THREE.Color) {
-  out.set('#e2185a');
-  out.lerp(new THREE.Color('#6b3fbf'), t);
-  out.offsetHSL(0, 0.04 * energy, 0.1 * energy);
+  out.set('#ff2d6f');
+  out.lerp(lerpB, t * 0.85);
+  out.offsetHSL(0, 0.06 * energy, 0.08 + 0.14 * energy);
+}
+
+const PEAK_PALETTE = [
+  new THREE.Color('#2ec4b6'),
+  new THREE.Color('#4cc9f0'),
+  new THREE.Color('#90e0ef'),
+  new THREE.Color('#fee440'),
+  new THREE.Color('#ff9f1c'),
+  new THREE.Color('#ff6b6b'),
+  new THREE.Color('#f72585'),
+  new THREE.Color('#b5179e'),
+  new THREE.Color('#7b2cbf'),
+  new THREE.Color('#4361ee'),
+];
+
+function mixPeakColor(t: number, energy: number, time: number, out: THREE.Color) {
+  const n = PEAK_PALETTE.length;
+  const drifting = ((t * n) + time * 0.35) % n;
+  const i0 = Math.floor(drifting) % n;
+  const i1 = (i0 + 1) % n;
+  const frac = drifting - Math.floor(drifting);
+  out.copy(PEAK_PALETTE[i0]!).lerp(PEAK_PALETTE[i1]!, frac);
+  out.offsetHSL(0, 0.04 * energy, 0.08 + 0.16 * energy);
+}
+
+function barDepth(t: number): number {
+  return Math.sin(t * Math.PI) * 0.55;
 }
 
 function createBackdropTexture(): THREE.CanvasTexture {
+  const size = 256;
   const canvas = document.createElement('canvas');
-  canvas.width = 8;
-  canvas.height = 256;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-    gradient.addColorStop(0, '#fff8f0');
-    gradient.addColorStop(0.45, '#f3d6e4');
-    gradient.addColorStop(1, '#e5d0f2');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 8, 256);
+    const sky = ctx.createLinearGradient(0, 0, 0, size);
+    sky.addColorStop(0, '#2a1848');
+    sky.addColorStop(0.28, '#6b3a6e');
+    sky.addColorStop(0.55, '#c9789a');
+    sky.addColorStop(0.78, '#f0c4b0');
+    sky.addColorStop(1, '#f7e6d4');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, size, size);
+
+    const bloom = ctx.createRadialGradient(size / 2, size * 0.4, 10, size / 2, size * 0.55, size * 0.65);
+    bloom.addColorStop(0, 'rgba(255, 120, 170, 0.45)');
+    bloom.addColorStop(0.45, 'rgba(140, 90, 220, 0.22)');
+    bloom.addColorStop(1, 'rgba(40, 20, 70, 0)');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(0, 0, size, size);
+
+    ctx.strokeStyle = 'rgba(255, 248, 240, 0.06)';
+    ctx.lineWidth = 1;
+    for (let y = 20; y < size; y += 18) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(size, y);
+      ctx.stroke();
+    }
+    for (let x = 12; x < size; x += 22) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, size);
+      ctx.stroke();
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   return texture;
 }
 
-/** Keep the full bar row + peaks inside the frustum for any aspect ratio. */
 function frameCamera(
   camera: THREE.PerspectiveCamera,
   aspect: number,
@@ -79,11 +149,33 @@ function frameCamera(
   const dist = Math.max(distW, distH, 3.2);
 
   const baseX = 0;
-  const baseY = targetY + dist * 0.22;
-  const baseZ = dist * 0.9;
+  const baseY = targetY + dist * 0.16;
+  const baseZ = dist * 0.98;
   camera.position.set(baseX, baseY, baseZ);
-  camera.lookAt(0, targetY, 0);
+  camera.lookAt(0, targetY * 0.85, 0.15);
   return { baseX, baseY, baseZ, targetY };
+}
+
+function disposeObject(root: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>();
+  const materials = new Set<THREE.Material>();
+  const textures = new Set<THREE.Texture>();
+
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (mesh.geometry) geometries.add(mesh.geometry);
+    const material = mesh.material;
+    if (!material) return;
+    for (const mat of Array.isArray(material) ? material : [material]) {
+      materials.add(mat);
+      const map = (mat as THREE.MeshBasicMaterial).map;
+      if (map) textures.add(map);
+    }
+  });
+
+  for (const texture of textures) texture.dispose();
+  for (const material of materials) material.dispose();
+  for (const geometry of geometries) geometry.dispose();
 }
 
 export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DProps) {
@@ -105,6 +197,7 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
     let renderer: THREE.WebGLRenderer | undefined;
     let mirror: Reflector | undefined;
     let backdropTexture: THREE.CanvasTexture | undefined;
+    let lastFrameMs = 0;
 
     const fail = (reason: unknown) => {
       console.error('[Spectrum3D]', reason);
@@ -113,9 +206,11 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
 
     try {
       renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: false,
         alpha: false,
-        powerPreference: 'high-performance',
+        powerPreference: 'low-power',
+        stencil: false,
+        depth: true,
       });
     } catch (error) {
       fail(error);
@@ -124,17 +219,14 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
 
     try {
       const scene = new THREE.Scene();
-      if (isBackdrop) {
-        scene.background = new THREE.Color(0xf6ebdf);
-        renderer.setClearColor(0xf6ebdf, 1);
-      } else {
-        scene.background = new THREE.Color(0xf6ebdf);
-      }
-      scene.fog = new THREE.Fog(0xf6ebdf, 10, 22);
+      const clear = 0x1c1230;
+      scene.background = new THREE.Color(clear);
+      if (isBackdrop) renderer.setClearColor(clear, 1);
+      scene.fog = new THREE.Fog(0x2a1848, 18, 36);
 
-      const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+      const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
 
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.12;
@@ -143,128 +235,136 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
       renderer.domElement.style.height = '100%';
       host.appendChild(renderer.domElement);
 
-      scene.add(new THREE.AmbientLight(0xfff1e4, 0.75));
-      scene.add(new THREE.HemisphereLight(0xffe8f2, 0xe8d7c4, 0.9));
+      scene.add(new THREE.AmbientLight(0xffe8f4, 0.55));
+      scene.add(new THREE.HemisphereLight(0xffd8ec, 0x2a1848, 0.85));
 
-      const key = new THREE.PointLight(0xff3d7a, 40, 24, 2);
-      key.position.set(-2.8, 3.6, 3.8);
+      const key = new THREE.PointLight(0xff4d88, 42, 22, 1.8);
+      key.position.set(-3.2, 4.2, 5.2);
       scene.add(key);
 
-      const fill = new THREE.PointLight(0x8a5cff, 26, 20, 2);
-      fill.position.set(3.2, 2.8, 2.4);
+      const fill = new THREE.PointLight(0x9b6cff, 28, 20, 1.9);
+      fill.position.set(3.6, 3.2, 3.2);
       scene.add(fill);
-
-      const rim = new THREE.DirectionalLight(0xfff8ee, 1.05);
-      rim.position.set(1.4, 5, -4);
-      scene.add(rim);
-
-      const floorGlow = new THREE.PointLight(0xe2185a, 14, 12, 2);
-      floorGlow.position.set(0, 0.35, 1.1);
-      scene.add(floorGlow);
 
       backdropTexture = createBackdropTexture();
       const backdrop = new THREE.Mesh(
-        new THREE.PlaneGeometry(22, 12),
+        new THREE.PlaneGeometry(30, 17),
         new THREE.MeshBasicMaterial({ map: backdropTexture }),
       );
-      backdrop.position.set(0, 2.8, -4.2);
+      backdrop.position.set(0, 3.4, -5.6);
       scene.add(backdrop);
 
-      const spacing = 0.195;
-      const radius = 0.072;
-      const totalWidth = (BAR_COUNT - 1) * spacing;
-      const halfWidth = totalWidth / 2;
-      const contentHeight = MAX_HEIGHT + 0.35;
-      let camFrame = frameCamera(camera, 1.6, halfWidth, contentHeight);
-
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-      mirror = new Reflector(new THREE.PlaneGeometry(20, 10), {
+      // Light Reflector: fixed 512×256 RT, no MSAA, never resized with the panel.
+      mirror = new Reflector(new THREE.PlaneGeometry(18, 10), {
         clipBias: 0.003,
-        textureWidth: Math.max(512, Math.floor(host.clientWidth * pixelRatio) || 1024),
-        textureHeight: Math.max(256, Math.floor(host.clientHeight * pixelRatio) || 512),
-        color: 0xfff3ea,
+        textureWidth: REFLECTOR_WIDTH,
+        textureHeight: REFLECTOR_HEIGHT,
+        color: 0xfff5ee,
+        multisample: 0,
       });
       mirror.rotation.x = -Math.PI / 2;
       mirror.position.y = 0;
       scene.add(mirror);
 
       const sheen = new THREE.Mesh(
-        new THREE.PlaneGeometry(20, 10),
-        new THREE.MeshPhysicalMaterial({
-          color: 0xfff8f0,
+        new THREE.PlaneGeometry(18, 10),
+        new THREE.MeshBasicMaterial({
+          color: 0xfff8f2,
           transparent: true,
-          opacity: 0.18,
-          roughness: 0.18,
-          metalness: 0.04,
-          clearcoat: 1,
-          clearcoatRoughness: 0.15,
+          opacity: 0.28,
+          depthWrite: false,
         }),
       );
       sheen.rotation.x = -Math.PI / 2;
       sheen.position.y = 0.004;
       scene.add(sheen);
 
+      const spacing = BAR_SPACING;
+      const radius = BAR_RADIUS;
+      const totalWidth = (BAR_COUNT - 1) * spacing;
+      const halfWidth = totalWidth / 2;
+      const contentHeight = MAX_HEIGHT + 1.05;
+      let camFrame = frameCamera(camera, 1.6, halfWidth, contentHeight);
+
       const dummy = new THREE.Object3D();
       const color = new THREE.Color();
+      const peakColor = new THREE.Color();
 
-      const barGeo = new THREE.CylinderGeometry(radius, radius * 0.92, 1, 16);
+      const barGeo = new THREE.CylinderGeometry(radius * 0.72, radius, 1, 10, 1, false);
       barGeo.translate(0, 0.5, 0);
       const barMat = new THREE.MeshStandardMaterial({
-        roughness: 0.22,
-        metalness: 0.42,
+        roughness: 0.28,
+        metalness: 0.45,
         emissive: new THREE.Color(0xe2185a),
-        emissiveIntensity: 0.4,
+        emissiveIntensity: 0.5,
       });
       const bars = new THREE.InstancedMesh(barGeo, barMat, BAR_COUNT);
       bars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(bars);
 
-      const mirrorBars = new THREE.InstancedMesh(
-        barGeo,
-        new THREE.MeshStandardMaterial({
-          roughness: 0.35,
-          metalness: 0.25,
-          transparent: true,
-          opacity: 0.32,
-          emissive: new THREE.Color(0xe2185a),
-          emissiveIntensity: 0.2,
-        }),
-        BAR_COUNT,
-      );
+      const capGeo = new THREE.SphereGeometry(radius * 0.78, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
+      const capMat = new THREE.MeshStandardMaterial({
+        roughness: 0.22,
+        metalness: 0.55,
+        emissive: new THREE.Color(0xff5a9a),
+        emissiveIntensity: 0.32,
+      });
+      const caps = new THREE.InstancedMesh(capGeo, capMat, BAR_COUNT);
+      caps.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      scene.add(caps);
+
+      const mirrorMat = new THREE.MeshBasicMaterial({
+        transparent: true,
+        opacity: 0.1,
+        depthWrite: false,
+      });
+      const mirrorBars = new THREE.InstancedMesh(barGeo, mirrorMat, BAR_COUNT);
       mirrorBars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mirrorBars.scale.y = -1;
+      // Soft ghost under the real Reflector — cheap depth cue without a second RT.
       scene.add(mirrorBars);
 
-      const peakGeo = new THREE.SphereGeometry(radius * 0.88, 12, 10);
+      const peakGeo = new THREE.SphereGeometry(radius * 0.88, 8, 6);
       const peakMat = new THREE.MeshStandardMaterial({
-        color: 0xfff8ee,
-        emissive: new THREE.Color(0xffd0e4),
-        emissiveIntensity: 0.95,
-        roughness: 0.28,
-        metalness: 0.12,
+        color: 0xffffff,
+        emissive: new THREE.Color(0xffffff),
+        emissiveIntensity: 1.05,
+        roughness: 0.35,
+        metalness: 0.2,
       });
       const peaksMesh = new THREE.InstancedMesh(peakGeo, peakMat, BAR_COUNT);
       peaksMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      peaksMesh.renderOrder = 3;
       scene.add(peaksMesh);
 
       for (let i = 0; i < BAR_COUNT; i += 1) {
         const x = i * spacing - halfWidth;
-        mixBarColor(i / Math.max(1, BAR_COUNT - 1), 0.2, color);
+        const band = i / Math.max(1, BAR_COUNT - 1);
+        const z = barDepth(band);
+        mixBarColor(band, 0.2, color);
+        mixPeakColor(band, 0.35, 0, peakColor);
         bars.setColorAt(i, color);
+        caps.setColorAt(i, color);
         mirrorBars.setColorAt(i, color);
-        dummy.position.set(x, 0, 0);
+        peaksMesh.setColorAt(i, peakColor);
+        dummy.position.set(x, 0, z);
         dummy.scale.set(1, FLOOR, 1);
         dummy.updateMatrix();
         bars.setMatrixAt(i, dummy.matrix);
         mirrorBars.setMatrixAt(i, dummy.matrix);
-        dummy.position.set(x, FLOOR * MAX_HEIGHT + 0.08, 0);
+        dummy.position.set(x, FLOOR * MAX_HEIGHT, z);
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
+        caps.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(x, FLOOR * MAX_HEIGHT + radius * 1.1, z);
         peaksMesh.setMatrixAt(i, dummy.matrix);
       }
       if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
+      if (caps.instanceColor) caps.instanceColor.needsUpdate = true;
       if (mirrorBars.instanceColor) mirrorBars.instanceColor.needsUpdate = true;
+      if (peaksMesh.instanceColor) peaksMesh.instanceColor.needsUpdate = true;
       bars.instanceMatrix.needsUpdate = true;
+      caps.instanceMatrix.needsUpdate = true;
       mirrorBars.instanceMatrix.needsUpdate = true;
       peaksMesh.instanceMatrix.needsUpdate = true;
 
@@ -274,7 +374,7 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
       display.fill(FLOOR);
       peaks.fill(FLOOR);
 
-      let freqBuffer: Uint8Array | null = null;
+      let freqBuffer: Uint8Array<ArrayBuffer> | null = null;
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const timer = new THREE.Timer();
       timer.connect(document);
@@ -285,37 +385,47 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
         const w = Math.max(2, Math.floor(rect.width));
         const h = Math.max(2, Math.floor(rect.height));
         camFrame = frameCamera(camera, w / h, halfWidth, contentHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
         renderer.setSize(w, h, false);
-        const pr = Math.min(window.devicePixelRatio || 1, 2);
-        mirror?.getRenderTarget().setSize(Math.floor(w * pr), Math.floor(h * pr));
       };
 
       resize();
       const observer = new ResizeObserver(() => resize());
       observer.observe(host);
-      requestAnimationFrame(resize);
 
-      const renderLoop = () => {
+      const onVisibility = () => {
+        if (!document.hidden && !disposed) {
+          lastFrameMs = 0;
+          timer.update();
+        }
+      };
+      document.addEventListener('visibilitychange', onVisibility);
+
+      const renderLoop = (now: number) => {
         if (disposed || !renderer) return;
         frame = requestAnimationFrame(renderLoop);
+
+        if (document.hidden) return;
+
+        const isPlaying = playingRef.current;
+        const minDelta = isPlaying ? 1000 / 45 : 1000 / IDLE_FPS;
+        if (lastFrameMs && now - lastFrameMs < minDelta) return;
+        lastFrameMs = now;
 
         try {
           timer.update();
           const t = timer.getElapsed();
           const currentAnalyser = analyserRef.current;
-          const isPlaying = playingRef.current;
 
           if (currentAnalyser) {
             if (!freqBuffer || freqBuffer.length !== currentAnalyser.frequencyBinCount) {
-              freqBuffer = new Uint8Array(currentAnalyser.frequencyBinCount);
+              freqBuffer = new Uint8Array(new ArrayBuffer(currentAnalyser.frequencyBinCount));
             }
-            currentAnalyser.smoothingTimeConstant = Math.min(currentAnalyser.smoothingTimeConstant, 0.22);
-            currentAnalyser.minDecibels = -92;
-            currentAnalyser.maxDecibels = -18;
             currentAnalyser.getByteFrequencyData(freqBuffer);
+            groupBinsInto(freqBuffer, BAR_COUNT, levelsScratch);
           }
 
-          const levels = freqBuffer && currentAnalyser ? groupBins(freqBuffer, BAR_COUNT) : null;
+          const levels = freqBuffer && currentAnalyser ? levelsScratch : null;
           let energySum = 0;
 
           for (let i = 0; i < BAR_COUNT; i += 1) {
@@ -339,49 +449,69 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
             }
 
             const x = i * spacing - halfWidth;
+            const band = i / Math.max(1, BAR_COUNT - 1);
+            const z = barDepth(band);
             const h = Math.max(FLOOR, boosted) * MAX_HEIGHT;
-            dummy.position.set(x, 0, 0);
-            dummy.scale.set(1, h, 1);
+            const girth = 1 + boosted * 0.28;
+            dummy.rotation.set(0, 0, 0);
+            dummy.position.set(x, 0, z);
+            dummy.scale.set(girth, h, girth);
             dummy.updateMatrix();
             bars.setMatrixAt(i, dummy.matrix);
             mirrorBars.setMatrixAt(i, dummy.matrix);
 
-            mixBarColor(i / Math.max(1, BAR_COUNT - 1), boosted, color);
+            mixBarColor(band, boosted, color);
             bars.setColorAt(i, color);
-            mirrorBars.setColorAt(i, color);
+            caps.setColorAt(i, color);
+            lerpA.copy(color).multiplyScalar(0.55);
+            lerpA.offsetHSL(0, -0.08, 0.18);
+            mirrorBars.setColorAt(i, lerpA);
 
-            dummy.position.set(x, peaks[i]! * MAX_HEIGHT + radius * 0.95, 0);
-            dummy.scale.set(1, 1, 1);
+            dummy.position.set(x, h, z);
+            dummy.scale.set(girth, girth, girth);
+            dummy.updateMatrix();
+            caps.setMatrixAt(i, dummy.matrix);
+
+            mixPeakColor(band, boosted, t, peakColor);
+            peaksMesh.setColorAt(i, peakColor);
+
+            const peakScale = 0.9 + boosted * 0.55;
+            dummy.position.set(x, peaks[i]! * MAX_HEIGHT + radius * 1.15 * peakScale, z);
+            dummy.scale.set(peakScale, peakScale, peakScale);
             dummy.updateMatrix();
             peaksMesh.setMatrixAt(i, dummy.matrix);
           }
 
           bars.instanceMatrix.needsUpdate = true;
+          caps.instanceMatrix.needsUpdate = true;
           mirrorBars.instanceMatrix.needsUpdate = true;
           peaksMesh.instanceMatrix.needsUpdate = true;
           if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
+          if (caps.instanceColor) caps.instanceColor.needsUpdate = true;
           if (mirrorBars.instanceColor) mirrorBars.instanceColor.needsUpdate = true;
+          if (peaksMesh.instanceColor) peaksMesh.instanceColor.needsUpdate = true;
 
           const avgEnergy = energySum / BAR_COUNT;
-          barMat.emissiveIntensity = 0.3 + avgEnergy * 0.7;
-          floorGlow.intensity = 10 + avgEnergy * 20;
+          barMat.emissiveIntensity = 0.38 + avgEnergy * 0.85;
+          capMat.emissiveIntensity = 0.26 + avgEnergy * 0.6;
+          peakMat.emissiveIntensity = 0.9 + avgEnergy * 0.75;
+          renderer.toneMappingExposure = 1.06 + avgEnergy * 0.18;
 
           if (!reduceMotion) {
-            // Gentle left/right balance — orbit + slight roll, stronger while playing.
             const amp = isPlaying ? 1 : 0.35;
-            const yaw = Math.sin(t * 0.38) * 0.11 * amp;
-            const bob = Math.sin(t * 0.27) * 0.04 * amp;
-            const breathe = Math.cos(t * 0.21) * 0.05 * amp;
-            const radius = Math.hypot(camFrame.baseX, camFrame.baseZ) || camFrame.baseZ;
-            camera.position.x = Math.sin(yaw) * radius;
+            const yaw = Math.sin(t * 0.38) * 0.1 * amp;
+            const bob = Math.sin(t * 0.27) * 0.035 * amp;
+            const breathe = Math.cos(t * 0.21) * 0.045 * amp;
+            const orbitR = Math.hypot(camFrame.baseX, camFrame.baseZ) || camFrame.baseZ;
+            camera.position.x = Math.sin(yaw) * orbitR;
             camera.position.y = camFrame.baseY + bob;
-            camera.position.z = Math.cos(yaw) * radius + breathe;
-            camera.lookAt(0, camFrame.targetY, 0);
-            camera.rotation.z = -yaw * 0.22;
-            key.intensity = 34 + (isPlaying ? Math.sin(t * 3.2) * 7 : 0) + avgEnergy * 12;
+            camera.position.z = Math.cos(yaw) * orbitR + breathe;
+            camera.lookAt(0, camFrame.targetY * 0.85, 0.15);
+            camera.rotation.z = -yaw * 0.2;
+            key.intensity = 36 + (isPlaying ? Math.sin(t * 3.2) * 6 : 0) + avgEnergy * 12;
           } else {
             camera.position.set(camFrame.baseX, camFrame.baseY, camFrame.baseZ);
-            camera.lookAt(0, camFrame.targetY, 0);
+            camera.lookAt(0, camFrame.targetY * 0.85, 0.15);
             camera.rotation.z = 0;
           }
 
@@ -392,29 +522,31 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
         }
       };
 
-      renderLoop();
+      frame = requestAnimationFrame(renderLoop);
 
       return () => {
         disposed = true;
         cancelAnimationFrame(frame);
         observer.disconnect();
-        barGeo.dispose();
-        barMat.dispose();
-        (mirrorBars.material as THREE.Material).dispose();
-        peakGeo.dispose();
-        peakMat.dispose();
-        backdrop.geometry.dispose();
-        (backdrop.material as THREE.Material).dispose();
-        backdropTexture?.dispose();
-        sheen.geometry.dispose();
-        (sheen.material as THREE.Material).dispose();
-        mirror?.geometry.dispose();
-        mirror?.dispose();
+        document.removeEventListener('visibilitychange', onVisibility);
         timer.dispose();
+        if (mirror) {
+          scene.remove(mirror);
+          mirror.geometry.dispose();
+          mirror.dispose();
+          mirror = undefined;
+        }
+        disposeObject(scene);
+        backdropTexture?.dispose();
         renderer?.dispose();
+        renderer?.forceContextLoss();
+        const gl = renderer?.getContext();
+        const lose = gl?.getExtension('WEBGL_lose_context');
+        lose?.loseContext();
         if (renderer?.domElement.parentElement === host) {
           host.removeChild(renderer.domElement);
         }
+        renderer = undefined;
       };
     } catch (error) {
       renderer?.dispose();

@@ -69,7 +69,7 @@ function matchesField(track: Track, q: string, field: SearchField): boolean {
 
 export function searchLocalCatalog(
   query: string,
-  platform: 'amiga' | 'atari' | 'all',
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'all',
   field: SearchField = 'any',
 ): Track[] {
   const q = query.trim().toLowerCase();

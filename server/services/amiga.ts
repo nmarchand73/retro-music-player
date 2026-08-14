@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { isAmigaFormatPlayable } from '../../src/utils/amigaPlayable.js';
+import {
+  estimateModDurationSeconds,
+  getCachedAmigaDuration,
+  rememberAmigaDuration,
+} from './amigaDuration.js';
 import { isUadeAvailable } from './uade.js';
 
 const SEARCH_LIMIT = 80;
@@ -188,6 +193,7 @@ export interface AmigaRecord {
   game?: string;
   notes?: string;
   sizeBytes: number;
+  durationSeconds?: number;
   timestamp?: string;
   coverPath?: string;
 }
@@ -315,6 +321,7 @@ function toTrack(record: AmigaRecord): Track {
     artist: record.artist,
     format: record.format,
     sizeBytes: record.sizeBytes,
+    durationSeconds: record.durationSeconds,
     game: record.game,
     notes: record.notes,
     timestamp: record.timestamp,
@@ -389,17 +396,39 @@ async function findCoverPath(root: string, relativePath: string, absolutePath: s
   return undefined;
 }
 
+async function readModDurationHint(absolutePath: string): Promise<number | undefined> {
+  try {
+    const handle = await fs.open(absolutePath, 'r');
+    try {
+      const buf = Buffer.alloc(1084);
+      const { bytesRead } = await handle.read(buf, 0, 1084, 0);
+      return estimateModDurationSeconds(buf.subarray(0, bytesRead));
+    } finally {
+      await handle.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 async function indexFile(root: string, absolutePath: string): Promise<AmigaRecord | null> {
   const parsed = classifyFile(path.basename(absolutePath));
   if (!parsed) return null;
 
   const relativePath = path.relative(root, absolutePath).split(path.sep).join('/');
+  const id = pathToId(relativePath);
   const meta = metadataFromPath(relativePath, parsed);
   const stat = await fs.stat(absolutePath);
   const coverPath = await findCoverPath(root, relativePath, absolutePath);
+  const cachedDuration = await getCachedAmigaDuration(id);
+  const estimated =
+    cachedDuration ??
+    (parsed.format === 'MOD' || parsed.format === 'NST' || parsed.format === 'WOW'
+      ? await readModDurationHint(absolutePath)
+      : undefined);
 
   return {
-    id: pathToId(relativePath),
+    id,
     relativePath,
     absolutePath,
     title: meta.title,
@@ -409,6 +438,7 @@ async function indexFile(root: string, absolutePath: string): Promise<AmigaRecor
     game: meta.game,
     notes: meta.notes,
     sizeBytes: stat.size,
+    durationSeconds: estimated,
     timestamp: stat.mtime.toISOString(),
     coverPath,
   };
@@ -484,6 +514,18 @@ export async function getAmigaTrack(id: string): Promise<Track | null> {
   const index = await loadAmigaIndex();
   const local = index.find((record) => record.id === id);
   return local ? toTrack(local) : null;
+}
+
+/** Persist a measured duration (UADE WAV / client playback) onto the live index + disk cache. */
+export async function setAmigaTrackDuration(id: string, seconds: number): Promise<Track | null> {
+  const stored = await rememberAmigaDuration(id, seconds);
+  if (stored == null) return null;
+
+  const index = await loadAmigaIndex();
+  const local = index.find((record) => record.id === id);
+  if (!local) return null;
+  local.durationSeconds = stored;
+  return toTrack(local);
 }
 
 function recordHaystack(record: AmigaRecord, field: SearchField): string {

@@ -71,6 +71,16 @@ export function isAmigaFormatPlayable(format: string, uadeAvailable = false): bo
 }
 
 export function isTrackPlayable(track: Track, uadeAvailable = false): boolean {
-  if (track.platform !== 'amiga') return true;
-  return isAmigaFormatPlayable(track.format, uadeAvailable);
+  switch (track.platform) {
+    case 'amiga':
+      return isAmigaFormatPlayable(track.format, uadeAvailable);
+    case 'atari':
+    case 'cpc':
+    case 'c64':
+      return true;
+    default: {
+      const _exhaustive: never = track.platform;
+      throw new Error(`Unhandled platform: ${_exhaustive}`);
+    }
+  }
 }

@@ -16,6 +16,8 @@ scripts/.venv/
 # Local music dumps
 data/sndh/
 data/amiga/
+data/cpc/
+data/c64/
 data/cache/
 
 # Editor directories and files

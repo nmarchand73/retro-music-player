@@ -7,7 +7,7 @@ interface MiniSpectrumProps {
 }
 
 export function MiniSpectrum({ analyser, playing, variant = 'mini' }: MiniSpectrumProps) {
-  const barCount = variant === 'stage' ? 64 : 48;
+  const barCount = variant === 'stage' ? 72 : 56;
   const { canvasRef } = useSpectrum(analyser, playing, true, barCount);
 
   return (

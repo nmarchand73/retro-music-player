@@ -99,5 +99,27 @@ export function useBookmarks() {
       .catch(() => undefined);
   }, []);
 
-  return { bookmarks, isBookmarked, toggleBookmark };
+  const patchBookmark = useCallback((track: Track, patch: Partial<Track>) => {
+    const key = trackKey(track);
+    setBookmarks((prev) => {
+      const index = prev.findIndex((entry) => trackKey(entry) === key);
+      if (index < 0) return prev;
+      const current = prev[index];
+      if (!current) return prev;
+      const nextTrack = { ...current, ...patch };
+      if (
+        nextTrack.durationSeconds === current.durationSeconds &&
+        nextTrack.coverUrl === current.coverUrl &&
+        nextTrack.game === current.game
+      ) {
+        return prev;
+      }
+      const next = [...prev];
+      next[index] = nextTrack;
+      persist(next);
+      return next;
+    });
+  }, []);
+
+  return { bookmarks, isBookmarked, toggleBookmark, patchBookmark };
 }

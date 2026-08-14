@@ -8,11 +8,12 @@ const RELEASE = 0.28;
 
 function groupBins(data: Uint8Array, groups: number): Float32Array {
   const out = new Float32Array(groups);
-  const lo = 2;
-  const hi = Math.max(lo + 1, Math.floor(data.length * 0.72));
+  const lo = Math.max(5, Math.floor(data.length * 0.003));
+  const hi = Math.max(lo + 1, data.length - 1);
   const span = hi / lo;
 
   for (let i = 0; i < groups; i += 1) {
+    const t = i / Math.max(1, groups - 1);
     const start = Math.min(hi - 1, Math.floor(lo * Math.pow(span, i / groups)));
     const end = Math.min(hi, Math.max(start + 1, Math.floor(lo * Math.pow(span, (i + 1) / groups))));
     let peak = 0;
@@ -20,8 +21,13 @@ function groupBins(data: Uint8Array, groups: number): Float32Array {
       const v = data[j] ?? 0;
       if (v > peak) peak = v;
     }
-    const norm = peak / 255;
-    out[i] = Math.pow(norm, 1.15);
+    const gate = 14 + (1 - t) * 16;
+    if (peak < gate) {
+      out[i] = 0;
+      continue;
+    }
+    const shelf = 1 + t * 0.65;
+    out[i] = Math.min(1, Math.pow((peak - gate * 0.35) / 255, 1.05) * shelf);
   }
   return out;
 }

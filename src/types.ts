@@ -1,4 +1,4 @@
-export type MusicPlatform = 'amiga' | 'atari' | 'all';
+export type MusicPlatform = 'amiga' | 'atari' | 'cpc' | 'c64' | 'all';
 
 export type SearchField = 'any' | 'author' | 'game' | 'title';
 
@@ -8,12 +8,12 @@ export interface LibrarySearch {
   platform?: MusicPlatform;
 }
 
-export type TrackSource = 'sndh' | 'local' | 'amiga';
+export type TrackSource = 'sndh' | 'local' | 'amiga' | 'cpc' | 'c64';
 
 export interface Track {
   id: string;
   source: TrackSource;
-  platform: 'amiga' | 'atari';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
   title: string;
   artist: string;
   format: string;
@@ -43,12 +43,63 @@ export interface DatabaseInfo {
   id: string;
   name: string;
   description: string;
-  platform: 'amiga' | 'atari' | 'both';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'both';
   url: string;
   apiUrl?: string;
   connected: boolean;
   requiresKey: boolean;
   stats?: string;
+}
+
+export interface InsightRank {
+  label: string;
+  count: number;
+  amigaCount: number;
+  atariCount: number;
+  cpcCount: number;
+  c64Count: number;
+  share: number;
+  coverUrl?: string;
+}
+
+export interface InsightTrackBrief {
+  id: string;
+  source: 'amiga' | 'sndh' | 'cpc' | 'c64';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
+  title: string;
+  artist: string;
+  game?: string;
+  format: string;
+  durationSeconds?: number;
+  timestamp?: string;
+  streamUrl: string;
+  coverUrl?: string;
+}
+
+export interface InsightsResponse {
+  platform: MusicPlatform;
+  generatedAt: string;
+  overview: {
+    tracks: number;
+    amiga: number;
+    atari: number;
+    cpc: number;
+    c64: number;
+    composers: number;
+    games: number;
+    formats: number;
+    withDuration: number;
+    withGame: number;
+    totalDurationSeconds: number;
+    openmpt: number;
+    exotic: number;
+  };
+  topAuthors: InsightRank[];
+  topGames: InsightRank[];
+  formats: InsightRank[];
+  years: InsightRank[];
+  longest: InsightTrackBrief[];
+  recentlyAdded: InsightTrackBrief[];
 }
 
 export const SEARCH_FIELD_LABELS: Record<SearchField, string> = {

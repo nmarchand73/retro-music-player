@@ -31,3 +31,16 @@ for (const file of files) {
     fs.writeFileSync(workletPath, patched);
   }
 }
+
+const sidliteSrc = path.join(root, 'node_modules', 'libsidplayfp-wasm', 'dist', 'sidlite');
+const sidliteDest = path.join(destDir, 'sid', 'sidlite');
+if (!fs.existsSync(sidliteSrc)) {
+  console.warn('Missing libsidplayfp-wasm dist/sidlite — SID playback assets not copied');
+} else {
+  fs.mkdirSync(sidliteDest, { recursive: true });
+  for (const file of fs.readdirSync(sidliteSrc)) {
+    if (!/\.(js|wasm|d\.ts)$/.test(file)) continue;
+    fs.copyFileSync(path.join(sidliteSrc, file), path.join(sidliteDest, file));
+    console.log(`Copied sidlite/${file} to public/sid/sidlite/`);
+  }
+}

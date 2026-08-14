@@ -16,7 +16,7 @@ test.describe('Local SNDH library golden path', () => {
   test('browse the local archive, search Last Ninja, and start playback', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Atari ST & Amiga Player' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Atari · Amiga · CPC · C64/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'SNDH Archive' })).toBeVisible();
     await expect(page.getByText(/5,897 local SNDH files/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'The Mod Archive' })).toHaveCount(0);
@@ -94,7 +94,7 @@ test.describe('Local SNDH library golden path', () => {
     await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Expand player' })).toBeVisible();
     await page.getByRole('button', { name: 'Expand player' }).click();
-    await expect(page.getByRole('button', { name: 'Minimize player' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Collapse player' })).toBeVisible();
     await expect(player.getByRole('button', { name: 'Next track' })).toBeVisible();
 
     await player.getByRole('button', { name: 'Bookmark Last Ninja' }).click();
@@ -157,7 +157,7 @@ test.describe('Local SNDH library golden path', () => {
     await page.getByRole('button', { name: 'Expand player' }).click();
     await expect(page.getByRole('region', { name: 'Tracker pattern' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Pat / })).toBeVisible();
-    await page.getByRole('button', { name: 'Minimize player' }).click();
+    await page.getByRole('button', { name: 'Collapse player' }).click();
     await expect(page.getByRole('region', { name: 'Tracker pattern' })).toHaveCount(0);
     await expect(anarchyRow).toBeVisible();
 

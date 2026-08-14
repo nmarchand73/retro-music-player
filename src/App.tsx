@@ -1,15 +1,17 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchDatabases, searchTracks } from './api';
+import { fetchDatabases, reportAmigaDuration, searchTracks } from './api';
 import { DatabasePanel } from './components/DatabasePanel';
 import { PlayerBar } from './components/PlayerBar';
 import { TrackerVisualizer } from './components/TrackerVisualizer';
 import { TrackList, type LibraryView } from './components/TrackList';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
 import { useBookmarks } from './hooks/useBookmarks';
+import { useMachineSettings } from './hooks/useMachineSettings';
 import type { DatabaseInfo, LibrarySearch, MusicPlatform, SearchField, Track } from './types';
 import { SEARCH_FIELD_LABELS, SEARCH_FIELD_PLACEHOLDERS } from './types';
 import { sortTracks, type SortKey } from './utils/sortTracks';
 import { isTrackPlayable } from './utils/amigaPlayable';
+import { enabledMachines, MACHINE_LABELS, machinesQueryValue, type MachineId } from './utils/machines';
 import { trackKey } from './utils/trackKey';
 import './App.css';
 
@@ -26,12 +28,16 @@ function App() {
   const [databases, setDatabases] = useState<DatabaseInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(true);
+  const { machines, toggleMachine, enableAll } = useMachineSettings();
+  const activeMachines = useMemo(() => enabledMachines(machines), [machines]);
+  const machinesParam = useMemo(() => machinesQueryValue(machines), [machines]);
 
   const player = useMusicPlayer();
-  const { bookmarks, isBookmarked, toggleBookmark } = useBookmarks();
+  const { bookmarks, isBookmarked, toggleBookmark, patchBookmark } = useBookmarks();
   const tracksRef = useRef(tracks);
   const currentRef = useRef(player.currentTrack);
   const playRef = useRef(player.playTrack);
+  const reportedDurationRef = useRef<string | null>(null);
   const visibleTracks = useMemo(() => {
     const source = view === 'bookmarks' ? bookmarks : tracks;
     const sorted =
@@ -48,10 +54,17 @@ function App() {
       searchPlatform: MusicPlatform,
       searchField: SearchField,
       searchPlayableOnly: boolean,
+      searchMachines: string,
     ) => {
       setLoading(true);
       try {
-        const result = await searchTracks(searchQuery, searchPlatform, searchField, searchPlayableOnly);
+        const result = await searchTracks(
+          searchQuery,
+          searchPlatform,
+          searchField,
+          searchPlayableOnly,
+          searchMachines,
+        );
         setTracks(result.tracks);
       } catch {
         setTracks([]);
@@ -77,14 +90,47 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (platform !== 'all' && !machines[platform as MachineId]) {
+      setPlatform('all');
+    }
+  }, [machines, platform]);
+
+  useEffect(() => {
     const delay = query.trim() ? 280 : 0;
     const timer = window.setTimeout(() => {
-      void runSearch(query, platform, field, playableOnly);
+      void runSearch(query, platform, field, playableOnly, machinesParam);
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [query, platform, field, playableOnly, runSearch]);
+  }, [query, platform, field, playableOnly, machinesParam, runSearch]);
 
   const currentTrackId = player.currentTrack ? trackKey(player.currentTrack) : null;
+
+  useEffect(() => {
+    reportedDurationRef.current = null;
+  }, [currentTrackId]);
+
+  useEffect(() => {
+    const track = player.currentTrack;
+    const duration = player.duration;
+    if (!track || track.source !== 'amiga' || !(duration > 0.5)) return;
+
+    const key = `${trackKey(track)}:${Math.round(duration)}`;
+    if (reportedDurationRef.current === key) return;
+    if (track.durationSeconds != null && Math.abs(track.durationSeconds - duration) < 1) {
+      reportedDurationRef.current = key;
+      return;
+    }
+
+    reportedDurationRef.current = key;
+    setTracks((prev) =>
+      prev.map((entry) =>
+        trackKey(entry) === trackKey(track) ? { ...entry, durationSeconds: duration } : entry,
+      ),
+    );
+    patchBookmark(track, { durationSeconds: duration });
+    void reportAmigaDuration(track.id, duration);
+  }, [patchBookmark, player.currentTrack, player.duration]);
+
   const displayTrack = useMemo(() => {
     const current = player.currentTrack;
     if (!current) return null;
@@ -137,7 +183,7 @@ function App() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void runSearch(query, platform, field, playableOnly);
+    void runSearch(query, platform, field, playableOnly, machinesParam);
   };
 
   const handleActivate = useCallback(
@@ -216,7 +262,7 @@ function App() {
         <div className="hero-top">
           <div className="hero-copy">
             <p className="eyebrow">Retro Music Library</p>
-            <h1>Atari ST &amp; Amiga Player</h1>
+            <h1>Atari · Amiga · CPC · C64</h1>
           </div>
           <DatabasePanel databases={databases} loading={dbLoading} />
         </div>
@@ -255,9 +301,14 @@ function App() {
               value={platform}
               onChange={(event) => setPlatform(event.target.value as MusicPlatform)}
             >
-              <option value="all">All platforms</option>
-              <option value="atari">Atari ST</option>
-              <option value="amiga">Amiga</option>
+              <option value="all">
+                {activeMachines.length === 4 ? 'All platforms' : `Enabled (${activeMachines.length})`}
+              </option>
+              {activeMachines.map((id) => (
+                <option key={id} value={id}>
+                  {MACHINE_LABELS[id]}
+                </option>
+              ))}
             </select>
           </label>
           <button type="submit">Search</button>
@@ -270,6 +321,7 @@ function App() {
           loading={loading}
           currentTrackId={currentTrackId}
           playerStatus={player.status}
+          playbackDuration={player.duration}
           searchField={field}
           query={query}
           sort={sort}
@@ -283,6 +335,10 @@ function App() {
           onToggleBookmark={toggleBookmark}
           onActivate={handleActivate}
           onSearch={handleFacetSearch}
+          machines={machines}
+          onToggleMachine={toggleMachine}
+          onEnableAllMachines={enableAll}
+          machinesParam={machinesParam}
         />
       </main>
 
@@ -291,18 +347,21 @@ function App() {
           <button
             type="button"
             className="player-dock-toggle"
-            aria-label={playerMinimized ? 'Expand player' : 'Minimize player'}
+            aria-label={playerMinimized ? 'Expand player' : 'Collapse player'}
             aria-expanded={!playerMinimized}
             onClick={() => setPlayerMinimized((value) => !value)}
           >
-            <svg className="player-dock-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              {playerMinimized ? (
-                <path fill="currentColor" d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-              ) : (
-                <path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
-              )}
-            </svg>
-            <span>{playerMinimized ? 'Expand' : 'Minimize'}</span>
+            <span className="player-dock-grip" aria-hidden="true" />
+            <span className="player-dock-toggle-label">
+              <svg className="player-dock-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                {playerMinimized ? (
+                  <path fill="currentColor" d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
+                ) : (
+                  <path fill="currentColor" d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" />
+                )}
+              </svg>
+              <span>{playerMinimized ? 'Expand' : 'Collapse'}</span>
+            </span>
           </button>
         </div>
         {!playerMinimized ? (

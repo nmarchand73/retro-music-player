@@ -21,6 +21,7 @@
     "concurrently": "^10.0.4",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "libsidplayfp-wasm": "^1.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.185.1",
