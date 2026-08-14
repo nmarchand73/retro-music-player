@@ -3,6 +3,7 @@ import { ChiptuneJsPlayer } from 'chiptune3';
 import initYm2149, { Ym2149Player } from 'ym2149-wasm';
 import type { Track } from '../types';
 import { absoluteStreamUrl } from '../api';
+import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
@@ -12,6 +13,9 @@ interface PlayerState {
   error: string | null;
   position: number;
   duration: number;
+  trackerSong: TrackerSong | null;
+  trackerPlayback: TrackerPlayback | null;
+  analyser: AnalyserNode | null;
 }
 
 let ymInitPromise: Promise<void> | null = null;
@@ -23,6 +27,11 @@ async function ensureYmInit(): Promise<void> {
   await ymInitPromise;
 }
 
+function toTrackerSong(meta: { song?: TrackerSong } | undefined): TrackerSong | null {
+  if (!meta?.song?.patterns?.length) return null;
+  return meta.song as TrackerSong;
+}
+
 export function useMusicPlayer() {
   const [state, setState] = useState<PlayerState>({
     status: 'idle',
@@ -30,10 +39,14 @@ export function useMusicPlayer() {
     error: null,
     position: 0,
     duration: 0,
+    trackerSong: null,
+    trackerPlayback: null,
+    analyser: null,
   });
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const chiptuneRef = useRef<ChiptuneJsPlayer | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const ymSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const progressTimerRef = useRef<number | null>(null);
 
@@ -60,6 +73,8 @@ export function useMusicPlayer() {
       }
       ymSourceRef.current = null;
     }
+
+    analyserRef.current = null;
   }, []);
 
   const playTrack = useCallback(
@@ -71,6 +86,9 @@ export function useMusicPlayer() {
         error: null,
         position: 0,
         duration: 0,
+        trackerSong: null,
+        trackerPlayback: null,
+        analyser: null,
       });
 
       try {
@@ -107,7 +125,7 @@ export function useMusicPlayer() {
           source.connect(ctx.destination);
           source.onended = () => {
             clearProgressTimer();
-            setState((prev) => ({ ...prev, status: 'idle', position: 0 }));
+            setState((prev) => ({ ...prev, status: 'idle', position: 0, trackerPlayback: null }));
           };
           source.start();
           ymSourceRef.current = source;
@@ -132,25 +150,50 @@ export function useMusicPlayer() {
           chiptuneRef.current = player;
 
           player.onInitialized(() => {
-            player.onMetadata((meta: { dur?: number }) => {
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = 0.35;
+            analyserRef.current = analyser;
+
+            if (player.processNode) {
+              player.processNode.disconnect();
+              player.gain.disconnect();
+              player.processNode.connect(analyser);
+              analyser.connect(player.gain);
+              player.gain.connect(ctx.destination);
+            }
+
+            player.onMetadata((meta) => {
               setState((prev) => ({
                 ...prev,
                 duration: meta.dur ?? player.duration ?? 0,
+                trackerSong: toTrackerSong(meta),
+                analyser,
               }));
             });
             player.onEnded(() => {
               clearProgressTimer();
-              setState((prev) => ({ ...prev, status: 'idle', position: 0 }));
+              setState((prev) => ({
+                ...prev,
+                status: 'idle',
+                position: 0,
+                trackerPlayback: null,
+              }));
             });
             player.onError(() => reject(new Error('Tracker playback failed')));
-            player.onProgress((progress: { pos?: number }) => {
+            player.onProgress((progress) => {
               setState((prev) => ({
                 ...prev,
                 position: progress.pos ?? player.getCurrentTime() ?? prev.position,
+                trackerPlayback: {
+                  order: progress.order ?? 0,
+                  pattern: progress.pattern ?? 0,
+                  row: progress.row ?? 0,
+                },
               }));
             });
             player.play(arrayBuffer);
-            setState((prev) => ({ ...prev, status: 'playing' }));
+            setState((prev) => ({ ...prev, status: 'playing', analyser }));
             resolve();
           });
         });
@@ -187,6 +230,9 @@ export function useMusicPlayer() {
       error: null,
       position: 0,
       duration: 0,
+      trackerSong: null,
+      trackerPlayback: null,
+      analyser: null,
     });
   }, [stopAll]);
 

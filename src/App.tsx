@@ -2,6 +2,7 @@ import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { fetchDatabases, searchTracks } from './api';
 import { DatabasePanel } from './components/DatabasePanel';
 import { PlayerBar } from './components/PlayerBar';
+import { TrackerVisualizer } from './components/TrackerVisualizer';
 import { TrackList } from './components/TrackList';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
 import type { DatabaseInfo, MusicPlatform, Track } from './types';
@@ -75,6 +76,12 @@ function App() {
       </header>
 
       <main className="content-grid">
+        <TrackerVisualizer
+          song={player.trackerSong}
+          playback={player.trackerPlayback}
+          analyser={player.analyser}
+          active={player.status === 'playing' || player.status === 'paused'}
+        />
         <DatabasePanel databases={databases} loading={dbLoading} />
         <TrackList
           tracks={tracks}

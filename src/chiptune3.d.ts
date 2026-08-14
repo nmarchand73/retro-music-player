@@ -3,6 +3,14 @@ declare module 'chiptune3' {
     dur?: number;
     title?: string;
     artist?: string;
+    song?: {
+      channels: string[];
+      patterns: Array<{
+        name: string;
+        rows: number[][][];
+      }>;
+      orders: Array<{ name: string; pat: number }>;
+    };
   }
 
   export interface ChiptuneProgress {
@@ -22,6 +30,9 @@ declare module 'chiptune3' {
   export class ChiptuneJsPlayer {
     constructor(cfg?: ChiptuneConfig);
     duration?: number;
+    meta?: ChiptuneMetadata;
+    gain: GainNode;
+    processNode?: AudioWorkletNode;
     onInitialized(handler: () => void): void;
     onEnded(handler: () => void): void;
     onError(handler: (error: { type?: string }) => void): void;
