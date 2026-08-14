@@ -2,7 +2,7 @@
 	AudioWorklet: DrSnuggles
 */
 
-import libopenmptPromise from './libopenmpt.worklet.js'
+import libopenmptPromise from '/libopenmpt.worklet.js'
 
 // consts
 const OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT = 2

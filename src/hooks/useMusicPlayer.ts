@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChiptuneJsPlayer } from 'chiptune3';
 import initYm2149, { Ym2149Player } from 'ym2149-wasm';
 import type { Track } from '../types';
 import { absoluteStreamUrl } from '../api';
+import { TrackerPlayer } from '../lib/trackerPlayer';
 import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
@@ -45,9 +45,9 @@ export function useMusicPlayer() {
   });
 
   const audioContextRef = useRef<AudioContext | null>(null);
-  const chiptuneRef = useRef<ChiptuneJsPlayer | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const ymSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const trackerRef = useRef<TrackerPlayer | null>(null);
+  const ymPlayerRef = useRef<Ym2149Player | null>(null);
+  const ymNodeRef = useRef<ScriptProcessorNode | null>(null);
   const progressTimerRef = useRef<number | null>(null);
 
   const clearProgressTimer = () => {
@@ -60,21 +60,118 @@ export function useMusicPlayer() {
   const stopAll = useCallback(() => {
     clearProgressTimer();
 
-    if (chiptuneRef.current) {
-      chiptuneRef.current.stop();
-      chiptuneRef.current = null;
+    if (trackerRef.current) {
+      trackerRef.current.stop();
+      trackerRef.current = null;
     }
 
-    if (ymSourceRef.current) {
-      try {
-        ymSourceRef.current.stop();
-      } catch {
-        // already stopped
+    if (ymNodeRef.current) {
+      ymNodeRef.current.disconnect();
+      ymNodeRef.current.onaudioprocess = null;
+      ymNodeRef.current = null;
+    }
+
+    if (ymPlayerRef.current) {
+      ymPlayerRef.current.stop();
+      ymPlayerRef.current.free();
+      ymPlayerRef.current = null;
+    }
+  }, []);
+
+  const playSndh = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
+    await ensureYmInit();
+    const player = new Ym2149Player(new Uint8Array(arrayBuffer));
+    ymPlayerRef.current = player;
+    player.play();
+
+    const duration = player.metadata.duration_seconds || 120;
+    const bufferSize = 2048;
+    const scriptNode = ctx.createScriptProcessor(bufferSize, 0, 2);
+    scriptNode.onaudioprocess = (event) => {
+      if (!ymPlayerRef.current?.is_playing()) return;
+
+      const samples = ymPlayerRef.current.generateSamples(bufferSize);
+      const left = event.outputBuffer.getChannelData(0);
+      const right = event.outputBuffer.getChannelData(1);
+      for (let i = 0; i < left.length; i += 1) {
+        const sample = samples[i] ?? 0;
+        left[i] = sample;
+        right[i] = sample;
       }
-      ymSourceRef.current = null;
+    };
+
+    scriptNode.connect(ctx.destination);
+    ymNodeRef.current = scriptNode;
+
+    const started = performance.now();
+    progressTimerRef.current = window.setInterval(() => {
+      const elapsed = (performance.now() - started) / 1000;
+      const playing = ymPlayerRef.current?.is_playing() ?? false;
+      setState((prev) => ({
+        ...prev,
+        position: Math.min(elapsed, duration),
+        duration,
+        status: !playing || elapsed >= duration ? 'idle' : 'playing',
+      }));
+      if (!playing || elapsed >= duration) {
+        clearProgressTimer();
+      }
+    }, 200);
+
+    setState((prev) => ({ ...prev, status: 'playing', duration }));
+  }, []);
+
+  const playMod = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
+    const player = new TrackerPlayer({ context: ctx });
+    trackerRef.current = player;
+    await player.init();
+
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.35;
+
+    if (player.processNode) {
+      player.processNode.disconnect();
+      player.gain.disconnect();
+      player.processNode.connect(analyser);
+      analyser.connect(player.gain);
+      player.gain.connect(ctx.destination);
     }
 
-    analyserRef.current = null;
+    await new Promise<void>((resolve, reject) => {
+      player.onMetadata((meta) => {
+        setState((prev) => ({
+          ...prev,
+          duration: Number(meta.dur ?? player.duration ?? 0),
+          trackerSong: toTrackerSong(meta as { song?: TrackerSong }),
+          analyser,
+        }));
+      });
+      player.onEnded(() => {
+        clearProgressTimer();
+        setState((prev) => ({
+          ...prev,
+          status: 'idle',
+          position: 0,
+          trackerPlayback: null,
+        }));
+      });
+      player.onError(() => reject(new Error('Tracker playback failed')));
+      player.onProgress((progress) => {
+        setState((prev) => ({
+          ...prev,
+          position: progress.pos ?? player.getCurrentTime() ?? prev.position,
+          trackerPlayback: {
+            order: progress.order ?? 0,
+            pattern: progress.pattern ?? 0,
+            row: progress.row ?? 0,
+          },
+        }));
+      });
+      player.play(arrayBuffer);
+      setState((prev) => ({ ...prev, status: 'playing', analyser }));
+      resolve();
+    });
   }, []);
 
   const playTrack = useCallback(
@@ -102,101 +199,11 @@ export function useMusicPlayer() {
         if (ctx.state === 'suspended') await ctx.resume();
 
         if (track.format.toUpperCase() === 'SNDH') {
-          await ensureYmInit();
-          const player = new Ym2149Player(new Uint8Array(arrayBuffer));
-          const duration = player.metadata.duration_seconds || 120;
-          const sampleRate = 44100;
-          const totalSamples = Math.floor(duration * sampleRate);
-          const audioBuffer = ctx.createBuffer(1, totalSamples, sampleRate);
-          const channel = audioBuffer.getChannelData(0);
-          const frameSize = 4096;
-          let offset = 0;
-
-          while (offset < totalSamples) {
-            const samples = player.generateSamples(frameSize);
-            for (let i = 0; i < samples.length && offset < totalSamples; i += 1) {
-              channel[offset] = samples[i];
-              offset += 1;
-            }
-          }
-
-          const source = ctx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(ctx.destination);
-          source.onended = () => {
-            clearProgressTimer();
-            setState((prev) => ({ ...prev, status: 'idle', position: 0, trackerPlayback: null }));
-          };
-          source.start();
-          ymSourceRef.current = source;
-
-          const started = performance.now();
-          progressTimerRef.current = window.setInterval(() => {
-            const elapsed = (performance.now() - started) / 1000;
-            setState((prev) => ({
-              ...prev,
-              position: Math.min(elapsed, duration),
-              duration,
-              status: elapsed >= duration ? 'idle' : 'playing',
-            }));
-          }, 200);
-
-          setState((prev) => ({ ...prev, status: 'playing', duration }));
+          await playSndh(arrayBuffer, ctx);
           return;
         }
 
-        await new Promise<void>((resolve, reject) => {
-          const player = new ChiptuneJsPlayer({ context: ctx });
-          chiptuneRef.current = player;
-
-          player.onInitialized(() => {
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 512;
-            analyser.smoothingTimeConstant = 0.35;
-            analyserRef.current = analyser;
-
-            if (player.processNode) {
-              player.processNode.disconnect();
-              player.gain.disconnect();
-              player.processNode.connect(analyser);
-              analyser.connect(player.gain);
-              player.gain.connect(ctx.destination);
-            }
-
-            player.onMetadata((meta) => {
-              setState((prev) => ({
-                ...prev,
-                duration: meta.dur ?? player.duration ?? 0,
-                trackerSong: toTrackerSong(meta),
-                analyser,
-              }));
-            });
-            player.onEnded(() => {
-              clearProgressTimer();
-              setState((prev) => ({
-                ...prev,
-                status: 'idle',
-                position: 0,
-                trackerPlayback: null,
-              }));
-            });
-            player.onError(() => reject(new Error('Tracker playback failed')));
-            player.onProgress((progress) => {
-              setState((prev) => ({
-                ...prev,
-                position: progress.pos ?? player.getCurrentTime() ?? prev.position,
-                trackerPlayback: {
-                  order: progress.order ?? 0,
-                  pattern: progress.pattern ?? 0,
-                  row: progress.row ?? 0,
-                },
-              }));
-            });
-            player.play(arrayBuffer);
-            setState((prev) => ({ ...prev, status: 'playing', analyser }));
-            resolve();
-          });
-        });
+        await playMod(arrayBuffer, ctx);
       } catch (error) {
         setState((prev) => ({
           ...prev,
@@ -205,19 +212,29 @@ export function useMusicPlayer() {
         }));
       }
     },
-    [stopAll],
+    [playMod, playSndh, stopAll],
   );
 
   const pause = useCallback(() => {
-    if (chiptuneRef.current) {
-      chiptuneRef.current.pause();
+    if (trackerRef.current) {
+      trackerRef.current.pause();
+      setState((prev) => ({ ...prev, status: 'paused' }));
+      return;
+    }
+    if (ymPlayerRef.current) {
+      ymPlayerRef.current.pause();
       setState((prev) => ({ ...prev, status: 'paused' }));
     }
   }, []);
 
   const resume = useCallback(() => {
-    if (chiptuneRef.current) {
-      chiptuneRef.current.unpause();
+    if (trackerRef.current) {
+      trackerRef.current.unpause();
+      setState((prev) => ({ ...prev, status: 'playing' }));
+      return;
+    }
+    if (ymPlayerRef.current) {
+      ymPlayerRef.current.play();
       setState((prev) => ({ ...prev, status: 'playing' }));
     }
   }, []);

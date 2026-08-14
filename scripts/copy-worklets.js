@@ -20,4 +20,14 @@ for (const file of files) {
   }
   fs.copyFileSync(src, path.join(destDir, file));
   console.log(`Copied ${file} to public/`);
+
+  if (file === 'chiptune3.worklet.js') {
+    const workletPath = path.join(destDir, file);
+    const contents = fs.readFileSync(workletPath, 'utf8');
+    const patched = contents.replace(
+      "from './libopenmpt.worklet.js'",
+      "from '/libopenmpt.worklet.js'",
+    );
+    fs.writeFileSync(workletPath, patched);
+  }
 }
