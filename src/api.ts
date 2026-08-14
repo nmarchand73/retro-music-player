@@ -13,17 +13,37 @@ export async function searchTracks(
   query: string,
   platform: MusicPlatform,
   field: SearchField,
+  playableOnly = true,
 ): Promise<SearchResponse> {
-  const params = new URLSearchParams({ q: query, platform, field });
+  const params = new URLSearchParams({
+    q: query,
+    platform,
+    field,
+    playable: playableOnly ? '1' : '0',
+  });
   const response = await fetch(`${API_BASE}/search?${params}`);
   if (!response.ok) throw new Error('Search failed');
   return response.json() as Promise<SearchResponse>;
 }
 
 export async function fetchTrack(source: string, id: string): Promise<Track> {
-  const response = await fetch(`${API_BASE}/track/${source}/${id}`);
+  const response = await fetch(`${API_BASE}/track/${encodeURIComponent(source)}/${encodeURIComponent(id)}`);
   if (!response.ok) throw new Error('Track not found');
   return response.json() as Promise<Track>;
+}
+
+export async function hydrateTrackCovers(tracks: Track[]): Promise<Track[]> {
+  if (tracks.length === 0) return tracks;
+  const response = await fetch(`${API_BASE}/covers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tracks }),
+  });
+  if (!response.ok) throw new Error('Cover hydrate failed');
+  const data = (await response.json()) as { tracks: Track[] };
+  if (!Array.isArray(data.tracks)) return tracks;
+  const byKey = new Map(data.tracks.map((track) => [`${track.source}:${track.id}`, track]));
+  return tracks.map((track) => byKey.get(`${track.source}:${track.id}`) ?? track);
 }
 
 export function absoluteStreamUrl(streamUrl: string): string {

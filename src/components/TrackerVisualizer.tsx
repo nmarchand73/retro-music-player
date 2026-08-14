@@ -1,5 +1,6 @@
-import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
-import { buildTrackerRows } from '../utils/trackerFormat';
+import type { CSSProperties, ReactNode } from 'react';
+import type { TrackerPlayback, TrackerSong, TrackerViewRow } from '../utils/trackerFormat';
+import { buildTrackerRows, formatHex } from '../utils/trackerFormat';
 import { useWaveform } from '../hooks/useWaveform';
 
 interface TrackerVisualizerProps {
@@ -7,70 +8,137 @@ interface TrackerVisualizerProps {
   playback: TrackerPlayback | null;
   analyser: AnalyserNode | null;
   active: boolean;
+  playing: boolean;
 }
 
-export function TrackerVisualizer({ song, playback, analyser, active }: TrackerVisualizerProps) {
-  const { rows, channelCount } = buildTrackerRows(song, playback);
-  const { canvasRef } = useWaveform(analyser, active);
+function TrackerRowView({ row }: { row: TrackerViewRow }) {
+  return (
+    <div
+      className={`tracker-row${row.isCurrent ? ' current' : ''}${row.isBeat ? ' beat' : ''}${row.outside ? ' outside' : ''}`}
+      style={{ '--fade': String(Math.min(0.55, row.distance * 0.07)) } as CSSProperties}
+    >
+      <div className="tracker-row-num">{row.outside ? '' : formatHex(row.rowIndex)}</div>
+      {row.cells.map((cell, cellIndex) => (
+        <div
+          key={cellIndex}
+          className={`tracker-cell${cell.empty ? ' empty' : ''}${cell.hasNote ? ' has-note' : ''}`}
+        >
+          <span className="note">{cell.note}</span>
+          <span className="inst">{cell.instrument}</span>
+          <span className="fx">{cell.effect}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  if (!active || rows.length === 0) {
-    return (
-      <section className="panel tracker-panel tracker-panel-empty">
-        <p className="muted">Start an Amiga tracker module to see the live pattern view.</p>
-      </section>
-    );
+function TrackerSheet({
+  columns,
+  children,
+}: {
+  columns: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <div className="tracker-sheet" style={columns}>
+      {children}
+    </div>
+  );
+}
+
+export function TrackerVisualizer({
+  song,
+  playback,
+  analyser,
+  active,
+  playing,
+}: TrackerVisualizerProps) {
+  const { rows, channelCount, totalChannels, channelNames, patternName, patternLength, activeChannels } =
+    buildTrackerRows(song, playback);
+  const mounted = active && rows.length > 0;
+  const { canvasRef } = useWaveform(analyser, playing, mounted);
+
+  if (!mounted || !playback) {
+    return null;
   }
 
+  const currentIndex = rows.findIndex((row) => row.isCurrent);
+  const ahead = currentIndex >= 0 ? rows.slice(0, currentIndex) : rows;
+  const current = currentIndex >= 0 ? rows[currentIndex] : null;
+  const behind = currentIndex >= 0 ? rows.slice(currentIndex + 1) : [];
+
+  const columns: CSSProperties = {
+    gridTemplateColumns: `2.35rem repeat(${channelCount}, minmax(7.4rem, 1fr))`,
+  };
+
   return (
-    <section className="panel tracker-panel">
+    <section className="panel tracker-panel" aria-label="Tracker pattern">
       <header className="tracker-header">
-        <div>
-          <p className="eyebrow">Tracker view</p>
-          <h2>
-            Pattern {playback?.pattern ?? 0} · Row {playback?.row ?? 0}
-          </h2>
-        </div>
+        <h2>
+          Pat {formatHex(playback.pattern)}
+          {patternName ? ` · ${patternName}` : ''}
+          <span className="tracker-header-row">
+            {' '}
+            · Row {formatHex(playback.row)}/{formatHex(Math.max(0, patternLength - 1))}
+          </span>
+        </h2>
         <div className="tracker-meta">
-          <span className="chip">Order {playback?.order ?? 0}</span>
-          <span className="chip subtle">{channelCount} channels</span>
+          <span className="chip">Ord {formatHex(playback.order)}</span>
+          <span className="chip subtle">
+            {channelCount === totalChannels
+              ? `${channelCount} ch`
+              : `${channelCount} / ${totalChannels} ch`}
+          </span>
         </div>
       </header>
 
-      <div className="tracker-grid" style={{ gridTemplateColumns: `repeat(${channelCount}, 1fr)` }}>
-        {Array.from({ length: channelCount }, (_, index) => (
-          <div key={index} className="tracker-channel">
-            <div className="tracker-channel-head">CH {index + 1}</div>
-            <div className="tracker-channel-cols">
-              <span>Note</span>
-              <span>Inst</span>
-              <span>Fx</span>
-            </div>
-          </div>
-        ))}
+      <div className="tracker-scope" aria-hidden="true">
+        <canvas ref={canvasRef} className="tracker-waveform" />
       </div>
 
-      <div className="tracker-body">
-        {rows.map((row) => (
-          <div key={row.rowIndex} className={`tracker-row ${row.isCurrent ? 'current' : ''}`}>
-            {row.isCurrent && (
-              <div className="tracker-playhead">
-                <canvas ref={canvasRef} className="tracker-waveform" width={640} height={28} />
-              </div>
-            )}
-            <div
-              className="tracker-row-grid"
-              style={{ gridTemplateColumns: `repeat(${channelCount}, 1fr)` }}
-            >
-              {row.cells.map((cell, cellIndex) => (
-                <div key={cellIndex} className="tracker-cell">
-                  <span className="note">{cell.note}</span>
-                  <span className="inst">{cell.instrument}</span>
-                  <span className="fx">{cell.effect}</span>
-                </div>
-              ))}
-            </div>
+      <div className="tracker-scroll">
+        <TrackerSheet columns={columns}>
+          <div className="tracker-corner" aria-hidden="true">
+            #
           </div>
-        ))}
+          {channelNames.map((name, index) => (
+            <div
+              key={`${name}-${index}`}
+              className={`tracker-channel ${activeChannels[index] ? 'live' : ''}`}
+            >
+              <div className="tracker-channel-head">{name}</div>
+              <div className="tracker-channel-cols">
+                <span>Nt</span>
+                <span>In</span>
+                <span>Fx</span>
+              </div>
+            </div>
+          ))}
+        </TrackerSheet>
+
+        <div className="tracker-lanes">
+          <div className="tracker-ahead">
+            <TrackerSheet columns={columns}>
+              {ahead.map((row) => (
+                <TrackerRowView key={row.outside ? `out-${row.rowIndex}` : row.rowIndex} row={row} />
+              ))}
+            </TrackerSheet>
+          </div>
+          {current ? (
+            <div className="tracker-now">
+              <TrackerSheet columns={columns}>
+                <TrackerRowView row={current} />
+              </TrackerSheet>
+            </div>
+          ) : null}
+          <div className="tracker-behind">
+            <TrackerSheet columns={columns}>
+              {behind.map((row) => (
+                <TrackerRowView key={row.outside ? `out-${row.rowIndex}` : row.rowIndex} row={row} />
+              ))}
+            </TrackerSheet>
+          </div>
+        </div>
       </div>
     </section>
   );

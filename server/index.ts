@@ -4,6 +4,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { searchLocalCatalog, getLocalTrack } from './data/localCatalog.js';
 import {
+  getAmigaTrack,
+  loadAmigaIndex,
+  localAmigaStats,
+  resolveAmigaCoverPath,
+  resolveAmigaFilePath,
+  searchAmiga,
+} from './services/amiga.js';
+import { attachGameCover, attachGameCovers, resolveGameCoverPath } from './services/covers.js';
+import {
   findLocalSndhByTitle,
   getSndhTrack,
   loadSndhIndex,
@@ -22,16 +31,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const COVER_HYDRATE_LIMIT = 200;
+
+async function loadLiveTrack(source: string, id: string): Promise<Track | null> {
+  if (source === 'sndh') return getSndhTrack(id);
+  if (source === 'amiga') return getAmigaTrack(id);
+  if (source === 'local') return getLocalTrack(id) ?? null;
+  return null;
+}
+
 app.get('/api/health', async (_req, res) => {
-  const sndh = await localSndhStats();
+  const [sndh, amiga] = await Promise.all([localSndhStats(), localAmigaStats()]);
   res.json({
     ok: true,
     sndhLocal: sndh,
+    amigaLocal: amiga,
   });
 });
 
 app.get('/api/databases', async (_req, res) => {
-  const sndh = await localSndhStats();
+  const [sndh, amiga] = await Promise.all([localSndhStats(), localAmigaStats()]);
   const databases: DatabaseInfo[] = [
     {
       id: 'sndh',
@@ -45,6 +64,20 @@ app.get('/api/databases', async (_req, res) => {
       requiresKey: false,
       stats: sndh.connected
         ? `${sndh.count.toLocaleString('en-US')} local SNDH files`
+        : 'Archive missing',
+    },
+    {
+      id: 'amiga',
+      name: 'UnExoticA',
+      description: amiga.connected
+        ? 'Local Amiga game music from UnExoticA. New extracts under data/amiga are picked up automatically.'
+        : 'Place UnExoticA extracts in data/amiga/unexotica (see scripts/fetch-unexotica.py).',
+      platform: 'amiga',
+      url: 'https://www.exotica.org.uk/wiki/UnExoticA',
+      connected: amiga.connected,
+      requiresKey: false,
+      stats: amiga.connected
+        ? `${amiga.count.toLocaleString('en-US')} local Amiga modules`
         : 'Archive missing',
     },
     {
@@ -76,12 +109,16 @@ app.get('/api/search', async (req, res) => {
   const query = String(req.query.q ?? '').trim();
   const platform = (String(req.query.platform ?? 'all') as MusicPlatform) || 'all';
   const field = (String(req.query.field ?? 'any') as SearchField) || 'any';
+  const playableOnly = String(req.query.playable ?? '1') !== '0';
 
   try {
     const tasks: Promise<Track[]>[] = [Promise.resolve(searchLocalCatalog(query, platform, field))];
 
     if (platform === 'all' || platform === 'atari') {
       tasks.push(searchSndh(query, field));
+    }
+    if (platform === 'all' || platform === 'amiga') {
+      tasks.push(searchAmiga(query, field, playableOnly));
     }
 
     const resultSets = await Promise.allSettled(tasks);
@@ -91,20 +128,27 @@ app.get('/api/search', async (req, res) => {
     for (const track of tracks) {
       unique.set(`${track.source}:${track.id}`, track);
     }
+    const covered = await attachGameCovers(Array.from(unique.values()));
 
-    const sndh = await localSndhStats();
+    const [sndh, amiga] = await Promise.all([localSndhStats(), localAmigaStats()]);
     const response: SearchResponse = {
       query,
       platform,
       field,
       total: unique.size,
-      tracks: Array.from(unique.values()),
+      tracks: covered,
       sources: {
         sndh: {
           connected: sndh.connected,
           message: sndh.connected
             ? `Local SNDH archive (${sndh.count.toLocaleString('en-US')} files)`
             : 'No local SNDH dump — falling back to sndh.atari.org',
+        },
+        amiga: {
+          connected: amiga.connected,
+          message: amiga.connected
+            ? `Local Amiga archive (${amiga.count.toLocaleString('en-US')} modules)`
+            : 'No local Amiga dump — add UnExoticA extracts to data/amiga',
         },
         local: {
           connected: true,
@@ -123,18 +167,61 @@ app.get('/api/track/:source/:id', async (req, res) => {
   const { source, id } = req.params;
 
   try {
-    let track = null;
-    if (source === 'sndh') track = await getSndhTrack(id);
-    else if (source === 'local') track = getLocalTrack(id) ?? null;
-
+    const track = await loadLiveTrack(source, id);
     if (!track) {
       res.status(404).json({ error: 'Track not found' });
       return;
     }
 
-    res.json(track);
+    res.json(await attachGameCover(track));
   } catch (error) {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Lookup failed' });
+  }
+});
+
+app.post('/api/covers', async (req, res) => {
+  const incoming = Array.isArray(req.body?.tracks) ? req.body.tracks : [];
+  try {
+    const resolved = await Promise.all(
+      incoming.slice(0, COVER_HYDRATE_LIMIT).map(async (raw: unknown) => {
+        if (!raw || typeof raw !== 'object') return null;
+        const stored = raw as Track;
+        if (typeof stored.id !== 'string' || typeof stored.source !== 'string') return stored;
+        const live = await loadLiveTrack(stored.source, stored.id);
+        return live ?? stored;
+      }),
+    );
+    const tracks = await attachGameCovers(resolved.filter((track): track is Track => track !== null));
+    res.json({ tracks });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Cover hydrate failed' });
+  }
+});
+
+app.get('/api/cover/:source/:id', async (req, res) => {
+  const { source, id } = req.params;
+  try {
+    let localPath: string | null = null;
+    if (source === 'amiga') {
+      localPath = await resolveAmigaCoverPath(id);
+    } else if (source === 'game') {
+      localPath = await resolveGameCoverPath(id);
+    } else {
+      res.status(404).json({ error: 'No cover for this source' });
+      return;
+    }
+    if (!localPath) {
+      res.status(404).json({ error: 'Cover not found' });
+      return;
+    }
+    const ext = path.extname(localPath).toLowerCase();
+    const type = ext === '.png' ? 'image/png' : 'image/jpeg';
+    res.setHeader('Content-Type', type);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.sendFile(localPath);
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Cover failed' });
   }
 });
 
@@ -166,6 +253,18 @@ app.get('/api/stream/:source/:id', async (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
       const buffer = Buffer.from(await upstream.arrayBuffer());
       res.send(buffer);
+      return;
+    }
+
+    if (source === 'amiga') {
+      const localPath = await resolveAmigaFilePath(id);
+      if (!localPath) {
+        res.status(404).json({ error: 'Amiga track not found' });
+        return;
+      }
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.sendFile(localPath);
       return;
     }
 
@@ -225,12 +324,17 @@ app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-const sndhIndex = await loadSndhIndex();
+const [sndhIndex, amigaIndex] = await Promise.all([loadSndhIndex(), loadAmigaIndex()]);
 app.listen(PORT, () => {
   console.log(`Retro Music Player API on http://localhost:${PORT}`);
   console.log(
     sndhIndex.length > 0
       ? `Local SNDH archive: ${sndhIndex.length.toLocaleString('en-US')} files`
       : 'No local SNDH archive — place sndh2026_lf.zip extract in data/sndh/sndh_lf',
+  );
+  console.log(
+    amigaIndex.length > 0
+      ? `Local Amiga archive: ${amigaIndex.length.toLocaleString('en-US')} modules`
+      : 'No local Amiga archive — extract UnExoticA packs into data/amiga/unexotica',
   );
 });

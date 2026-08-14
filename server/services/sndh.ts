@@ -2,7 +2,9 @@ import * as cheerio from 'cheerio';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { matchesAllTokens, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
+import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
 
 const SNDH_BASE = 'https://sndh.atari.org';
 const HEADER_BYTES = 4096;
@@ -23,6 +25,8 @@ export interface SndhRecord {
   year?: string;
   game?: string;
   notes?: string;
+  durationSeconds?: number;
+  timestamp?: string;
   sizeBytes: number;
 }
 
@@ -71,6 +75,9 @@ function toTrack(record: SndhRecord): Track {
     sizeBytes: record.sizeBytes,
     game: record.game,
     notes: record.notes,
+    year: record.year,
+    durationSeconds: record.durationSeconds,
+    timestamp: record.timestamp,
     streamUrl: `/api/stream/sndh/${record.id}`,
     detailUrl: `${SNDH_BASE}/`,
   };
@@ -110,6 +117,8 @@ async function indexFile(root: string, absolutePath: string): Promise<SndhRecord
     const year = readTag(header, 'YEAR');
     const game = isGamePath(relativePath) ? title : undefined;
     const notes = [year, game ? 'Game soundtrack' : undefined].filter(Boolean).join(' · ') || undefined;
+    const timing = parseSndhTiming(new Uint8Array(headerChunk));
+    const durationSeconds = timing.seconds ?? undefined;
     const stat = await handle.stat();
 
     return {
@@ -122,6 +131,8 @@ async function indexFile(root: string, absolutePath: string): Promise<SndhRecord
       year,
       game,
       notes,
+      durationSeconds,
+      timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
     };
   } finally {
@@ -192,50 +203,52 @@ export async function findLocalSndhByTitle(query: string): Promise<SndhRecord | 
   );
 }
 
-function scoreRecord(record: SndhRecord, query: string, field: SearchField): number {
-  const q = query.trim().toLowerCase();
-  if (!q) return 1;
-
-  const title = record.title.toLowerCase();
-  const artist = record.artist.toLowerCase();
-  const folderArtist = record.folderArtist.toLowerCase();
-  const notes = (record.notes ?? '').toLowerCase();
-  const game = (record.game ?? '').toLowerCase();
-  const year = (record.year ?? '').toLowerCase();
-
-  const includes = (value: string) => value.includes(q);
-  const starts = (value: string) => value.startsWith(q);
-  const exact = (value: string) => value === q;
+function recordHaystack(record: SndhRecord, field: SearchField): string {
+  const pathText = record.relativePath.replaceAll(/[_\-/.]+/g, ' ');
 
   switch (field) {
     case 'author':
-      if (exact(artist) || exact(folderArtist)) return 100;
-      if (starts(artist) || starts(folderArtist)) return 80;
-      if (includes(artist) || includes(folderArtist)) return 60;
-      return 0;
+      return `${record.artist} ${record.folderArtist}`;
     case 'title':
-      if (exact(title)) return 100;
-      if (starts(title)) return 80;
-      if (includes(title)) return 50;
-      return 0;
+      return record.title;
     case 'game':
-      if (exact(game) || exact(title)) return 100;
-      if (starts(game) || starts(title)) return 80;
-      if (includes(game) || includes(title) || includes(notes)) return 50;
-      return 0;
+      return `${record.game ?? ''} ${record.title} ${record.notes ?? ''} ${pathText}`;
     case 'any':
-      if (exact(title) || exact(artist)) return 100;
-      if (starts(title) || starts(artist) || starts(folderArtist)) return 80;
-      if (includes(title)) return 70;
-      if (includes(artist) || includes(folderArtist) || includes(game) || includes(notes) || includes(year)) {
-        return 40;
-      }
-      return 0;
+      return [
+        record.title,
+        record.artist,
+        record.folderArtist,
+        record.game,
+        record.notes,
+        record.year,
+        pathText,
+      ]
+        .filter(Boolean)
+        .join(' ');
     default: {
       const _exhaustive: never = field;
       throw new Error(`Unhandled search field: ${_exhaustive}`);
     }
   }
+}
+
+function scoreRecord(record: SndhRecord, query: string, field: SearchField): number {
+  const tokens = searchTokens(query);
+  if (tokens.length === 0) return 1;
+
+  const phrase = query.trim().toLowerCase();
+  const title = record.title.toLowerCase();
+  const artist = record.artist.toLowerCase();
+  const folderArtist = record.folderArtist.toLowerCase();
+  const haystack = recordHaystack(record, field);
+
+  if (!matchesAllTokens(haystack, tokens)) return 0;
+
+  if (title === phrase || artist === phrase || folderArtist === phrase) return 100;
+  if (title.startsWith(phrase) || artist.startsWith(phrase) || folderArtist.startsWith(phrase)) return 85;
+  if (title.includes(phrase) || artist.includes(phrase)) return 70;
+  if (tokens.every((token) => title.includes(token))) return 60;
+  return 40;
 }
 
 function searchLocalIndex(index: SndhRecord[], query: string, field: SearchField): Track[] {

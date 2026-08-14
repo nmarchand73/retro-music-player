@@ -2,7 +2,13 @@ export type MusicPlatform = 'amiga' | 'atari' | 'all';
 
 export type SearchField = 'any' | 'author' | 'game' | 'title';
 
-export type TrackSource = 'sndh' | 'local';
+export interface LibrarySearch {
+  query?: string;
+  field?: SearchField;
+  platform?: MusicPlatform;
+}
+
+export type TrackSource = 'sndh' | 'local' | 'amiga';
 
 export interface Track {
   id: string;
@@ -16,8 +22,11 @@ export interface Track {
   genre?: string;
   game?: string;
   notes?: string;
+  year?: string;
   timestamp?: string;
+  durationSeconds?: number;
   streamUrl: string;
+  coverUrl?: string;
   detailUrl?: string;
 }
 

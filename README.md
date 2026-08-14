@@ -1,18 +1,20 @@
 # Retro Music Player
 
-A React front-end music library and player for **Atari ST** YM2149 chiptunes.
+A React front-end music library and player for **Atari ST** YM2149 chiptunes and **Amiga** tracker modules.
 
 ## Connected Databases
 
 | Database | Platform | API | Status |
 |----------|----------|-----|--------|
 | [SNDH Archive](https://sndh.atari.org/) | Atari ST YM2149 | Local dump in `data/sndh/sndh_lf` | Offline search + playback |
+| [UnExoticA](https://www.exotica.org.uk/wiki/UnExoticA) | Amiga | Local extracts in `data/amiga/unexotica` | Offline search + playback |
 | [Amiga Music Preservation](https://amp.dascene.net/) | Amiga metadata | No public API | Reference only |
 | Local demo catalog | Atari ST | Built-in | Always available |
 
 ## Playback Engines
 
 - **Atari ST SNDH**: [ym2149-wasm](https://github.com/slippyex/ym2149-rs)
+- **Amiga modules**: [chiptune3](https://github.com/jsschelling/chiptune3) / libopenmpt
 
 ## Setup
 
@@ -31,6 +33,18 @@ The player searches and streams Atari tunes from a local copy of the official du
 3. Restart the server. The SNDH card should show **5,897 local SNDH files**.
 
 Override the folder with `SNDH_ARCHIVE_DIR` if needed. Without a local dump, search falls back to sndh.atari.org.
+
+### Local Amiga archive (UnExoticA)
+
+Game music lives under `data/amiga/unexotica/`. The player indexes **extracted modules** (`mod.*`, `med.*`, `p60.*`, …), not `.lha` packs, and skips sample/instrument files. New files dropped into `data/amiga` are picked up automatically.
+
+To download more UnExoticA game packs:
+
+```bash
+scripts/.venv/bin/python scripts/fetch-unexotica.py
+```
+
+That writes `.lha` files, extracts them beside each archive, and can be re-run; existing packs are skipped. Override the folder with `AMIGA_ARCHIVE_DIR` if needed.
 
 ## Development
 

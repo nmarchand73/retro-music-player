@@ -11,9 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+scripts/.venv/
 
-# Local SNDH archive (https://sndh.atari.org/download.php)
+# Local music dumps
 data/sndh/
+data/amiga/
 
 # Editor directories and files
 .vscode/*

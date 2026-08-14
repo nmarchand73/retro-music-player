@@ -5,42 +5,34 @@ interface DatabasePanelProps {
   loading: boolean;
 }
 
-const platformLabel = {
-  amiga: 'Amiga',
-  atari: 'Atari ST',
-  both: 'Both',
-};
-
 export function DatabasePanel({ databases, loading }: DatabasePanelProps) {
   if (loading) {
-    return <section className="panel databases-panel"><p className="muted">Loading databases…</p></section>;
+    return (
+      <section className="library-strip">
+        <p className="muted">Loading library…</p>
+      </section>
+    );
   }
 
+  const libraries = databases.filter((db) => db.connected && db.id !== 'local');
+  const shown = libraries.length > 0 ? libraries : databases.filter((db) => db.connected);
+
   return (
-    <section className="panel databases-panel">
-      <header className="panel-header">
-        <h2>Connected Databases</h2>
-        <p className="muted">Music libraries powering this player</p>
-      </header>
-      <div className="database-grid">
-        {databases.map((db) => (
-          <article key={db.id} className={`database-card ${db.connected ? 'connected' : 'disconnected'}`}>
-            <div className="database-card-top">
-              <span className={`status-dot ${db.connected ? 'on' : 'off'}`} />
-              <h3>{db.name}</h3>
-            </div>
-            <p>{db.description}</p>
-            <div className="database-meta">
-              <span className="chip">{platformLabel[db.platform]}</span>
-              {db.stats && <span className="chip subtle">{db.stats}</span>}
-              {db.requiresKey && <span className="chip warn">API key</span>}
-            </div>
+    <section className="library-strip" aria-label="Libraries">
+      {shown.map((db) => (
+        <article key={db.id} className="library-chip">
+          <span className={`status-dot ${db.connected ? 'on' : 'off'}`} />
+          <div>
+            <h2>{db.name}</h2>
+            {db.stats && <p className="muted">{db.stats}</p>}
+          </div>
+          {db.url && (
             <a href={db.url} target="_blank" rel="noreferrer" className="database-link">
-              Visit archive →
+              Archive
             </a>
-          </article>
-        ))}
-      </div>
+          )}
+        </article>
+      ))}
     </section>
   );
 }
