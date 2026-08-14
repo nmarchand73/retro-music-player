@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""
+Intent: native desktop shell for Retro Music Player (local window over Express).
+Architecture: owned Node server subprocess + pywebview (Cocoa); private_mode=False
+so player prefs persist; music dumps under ~/Library/Application Support (or repo
+data/ when developing); launch errors in Logs.
+Quality: 8/10 — MyChat / Chess Insight pattern adapted for Node + Vite dist.
+"""
+
+from __future__ import annotations
+
+import atexit
+import os
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+import traceback
+from pathlib import Path
+from typing import IO
+
+ROOT = Path(__file__).resolve().parent
+LOG_DIR = Path.home() / "Library" / "Logs"
+LOG_FILE = LOG_DIR / "Retro Music Player.log"
+SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "Retro Music Player"
+WEBVIEW_DIR = SUPPORT_DIR / "webview"
+PREFERRED_PORT = int(os.environ.get("PORT", os.environ.get("RETRO_MUSIC_PORT", "3010")))
+
+_server_proc: subprocess.Popen[str] | None = None
+
+
+def _log(msg: str) -> None:
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}\n"
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with LOG_FILE.open("a", encoding="utf-8") as fh:
+            fh.write(line)
+    except OSError:
+        pass
+    print(msg, flush=True)
+
+
+def _alert(title: str, message: str) -> None:
+    if sys.platform != "darwin":
+        return
+    try:
+
+        def esc(s: str) -> str:
+            return s.replace("\\", "\\\\").replace('"', '\\"')
+
+        subprocess.run(
+            [
+                "osascript",
+                "-e",
+                f'display alert "{esc(title)}" message "{esc(message)}" as critical',
+            ],
+            check=False,
+            capture_output=True,
+        )
+    except Exception:
+        pass
+
+
+def _port_open(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.25)
+        return sock.connect_ex((host, port)) == 0
+
+
+def _is_our_server(host: str, port: int) -> bool:
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(f"http://{host}:{port}/api/health", timeout=0.8) as resp:
+            if resp.getcode() != 200:
+                return False
+            body = resp.read(512).decode("utf-8", errors="ignore")
+            return "retro-music-player" in body and '"ok"' in body
+    except Exception:
+        return False
+
+
+def _wait_ready(host: str, port: int, timeout: float = 45.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _is_our_server(host, port):
+            return True
+        if _server_proc is not None and _server_proc.poll() is not None:
+            return False
+        time.sleep(0.15)
+    return False
+
+
+def _pick_free_port(host: str, preferred: int) -> int:
+    if not _port_open(host, preferred):
+        return preferred
+    ours = _is_our_server(host, preferred)
+    _log(
+        f"[retro-music] Port {preferred} is busy"
+        f"{' (leftover server)' if ours else ''} — picking another port"
+    )
+    for candidate in range(preferred + 1, preferred + 40):
+        if not _port_open(host, candidate):
+            return candidate
+    raise RuntimeError(f"No free port near {preferred}")
+
+
+def _has_archives(data_dir: Path) -> bool:
+    markers = [
+        data_dir / "sndh" / "sndh_lf",
+        data_dir / "amiga" / "unexotica",
+        data_dir / "cpc",
+        data_dir / "c64" / "HVSC" / "C64Music",
+    ]
+    return any(p.exists() for p in markers)
+
+
+def _resolve_data_dir() -> Path:
+    override = os.environ.get("RETRO_MUSIC_DATA_DIR", "").strip()
+    if override:
+        path = Path(override).expanduser().resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    repo_data = ROOT / "data"
+    if _has_archives(repo_data):
+        return repo_data
+
+    support_data = SUPPORT_DIR / "data"
+    support_data.mkdir(parents=True, exist_ok=True)
+    readme = support_data / "README.txt"
+    if not readme.is_file():
+        readme.write_text(
+            "Put music archives here (or symlink your existing dumps):\n"
+            "  sndh/sndh_lf/\n"
+            "  amiga/unexotica/\n"
+            "  cpc/cpc_lf/ and cpc/ym_games/\n"
+            "  c64/HVSC/C64Music/\n"
+            "\n"
+            "Example:\n"
+            "  ln -s /path/to/retro-music-player/data/sndh "
+            f'"{support_data / "sndh"}"\n',
+            encoding="utf-8",
+        )
+    return support_data
+
+
+def _find_node() -> str:
+    node = shutil.which("node")
+    if not node:
+        raise RuntimeError(
+            "Node.js was not found on PATH.\n"
+            "Install from https://nodejs.org/ or: brew install node"
+        )
+    return node
+
+
+def _find_tsx(app_root: Path) -> list[str]:
+    local = app_root / "node_modules" / "tsx" / "dist" / "cli.mjs"
+    if local.is_file():
+        return [str(local)]
+    tsx_bin = app_root / "node_modules" / ".bin" / "tsx"
+    if tsx_bin.is_file():
+        return [str(tsx_bin)]
+    which = shutil.which("tsx")
+    if which:
+        return [which]
+    raise RuntimeError(
+        "tsx is missing. From the app folder run:\n  npm install\n"
+        "Or rebuild with scripts/build_macos_app.sh"
+    )
+
+
+def _stop_server() -> None:
+    global _server_proc
+    proc = _server_proc
+    if proc is None:
+        return
+    _server_proc = None
+    if proc.poll() is not None:
+        return
+    _log("[retro-music] Stopping Node server…")
+    try:
+        proc.send_signal(signal.SIGTERM)
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=4.0)
+    except subprocess.TimeoutExpired:
+        _log("[retro-music] Force-killing Node server")
+        try:
+            proc.kill()
+        except OSError:
+            pass
+        try:
+            proc.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def _start_server(app_root: Path, host: str, port: int, data_dir: Path) -> None:
+    global _server_proc
+    node = _find_node()
+    tsx_args = _find_tsx(app_root)
+    server_entry = app_root / "server" / "index.ts"
+    if not server_entry.is_file():
+        raise RuntimeError(f"Missing server entry: {server_entry}")
+
+    env = os.environ.copy()
+    env["PORT"] = str(port)
+    env["RETRO_MUSIC_DESKTOP"] = "1"
+    env["RETRO_MUSIC_ROOT"] = str(app_root)
+    env["RETRO_MUSIC_DATA_DIR"] = str(data_dir)
+    env["NODE_ENV"] = env.get("NODE_ENV") or "production"
+
+    cmd = [node, *tsx_args, str(server_entry)]
+    _log(f"[retro-music] Starting: {' '.join(cmd)}")
+    log_fh: IO[str] = LOG_FILE.open("a", encoding="utf-8")
+    _server_proc = subprocess.Popen(
+        cmd,
+        cwd=str(app_root),
+        env=env,
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    atexit.register(_stop_server)
+
+
+def main() -> int:
+    os.chdir(ROOT)
+    os.environ.setdefault("PYWEBVIEW_GUI", "cocoa")
+    SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
+    WEBVIEW_DIR.mkdir(parents=True, exist_ok=True)
+
+    try:
+        if sys.platform == "darwin":
+            from AppKit import NSApplication
+
+            NSApplication.sharedApplication()
+        import webview
+    except ImportError as exc:
+        msg = (
+            f"Missing dependency: {exc}\n"
+            f"Install with:\n  npm run desktop:venv"
+        )
+        _log(msg)
+        _alert("Retro Music Player failed to start", msg)
+        return 1
+
+    host = "127.0.0.1"
+    dist_index = ROOT / "dist" / "index.html"
+    if not dist_index.is_file():
+        msg = (
+            "Missing production build (dist/index.html).\n"
+            "Run: npm run build\nThen: npm run desktop"
+        )
+        _log(msg)
+        _alert("Retro Music Player failed to start", msg)
+        return 1
+
+    try:
+        port = _pick_free_port(host, PREFERRED_PORT)
+        data_dir = _resolve_data_dir()
+        _log(f"[retro-music] Data dir: {data_dir}")
+        _start_server(ROOT, host, port, data_dir)
+    except Exception as exc:
+        _log(str(exc))
+        _alert("Retro Music Player failed to start", str(exc))
+        return 1
+
+    if not _wait_ready(host, port):
+        tail = ""
+        try:
+            tail = LOG_FILE.read_text(encoding="utf-8")[-600:]
+        except OSError:
+            pass
+        msg = f"Server failed to start on http://{host}:{port}\n\n{tail}"
+        _log(msg)
+        _stop_server()
+        _alert("Retro Music Player failed to start", msg[:900])
+        return 1
+
+    _log(f"[retro-music] Serving http://{host}:{port}")
+    url = f"http://{host}:{port}/"
+    webview.create_window(
+        title="Retro Music Player",
+        url=url,
+        width=1440,
+        height=920,
+        min_size=(960, 680),
+        background_color="#121018",
+    )
+    try:
+        webview.start(private_mode=False, storage_path=str(WEBVIEW_DIR))
+    finally:
+        _stop_server()
+        _log("[retro-music] Quit")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception:
+        tb = traceback.format_exc()
+        _log(tb)
+        _alert("Retro Music Player crashed", f"See log:\n{LOG_FILE}\n\n{tb[-800:]}")
+        raise SystemExit(1)

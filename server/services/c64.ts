@@ -1,8 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
+import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const SEARCH_LIMIT = 80;
 const EMPTY_SEARCH_LIMIT = 24;
@@ -14,9 +14,6 @@ const RELEASED_OFFSET = 0x56;
 const FIELD_LEN = 32;
 const HVSC_DETAIL = 'https://hvsc.c64.org/';
 const SKIP_DIRS = new Set(['documents', 'disks', 'update']);
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 export interface C64Record {
   id: string;
@@ -40,7 +37,7 @@ function archiveRoot(): string {
   if (override) {
     return path.resolve(PROJECT_ROOT, override);
   }
-  return path.join(PROJECT_ROOT, 'data', 'c64', 'HVSC', 'C64Music');
+  return path.join(DATA_ROOT, 'c64', 'HVSC', 'C64Music');
 }
 
 function pathToId(relativePath: string): string {

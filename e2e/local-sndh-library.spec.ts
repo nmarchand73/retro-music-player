@@ -23,23 +23,23 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.locator('.track-list [data-platform="atari"]').first()).toBeVisible();
     await expect(page.locator('.track-list [data-platform="amiga"]').first()).toBeVisible();
 
-    await expect(page.getByRole('tab', { name: 'Top Games' })).toBeVisible();
-    await page.getByRole('tab', { name: 'Top Games' }).click();
-    await expect(page.getByRole('heading', { name: 'Top Games' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'BEST', exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'BEST', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'BEST', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Amiga', level: 3 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Atari ST', level: 3 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'CPC', exact: true, level: 3 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'C64', exact: true, level: 3 })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Best games' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Best music' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Best games' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Best music' })).toHaveAttribute('aria-selected', 'true');
 
-    await page.getByRole('tab', { name: 'Best music' }).click();
     await expect(page.getByText(/Best Classic Computer Game Music/i).first()).toBeVisible();
     await page.getByRole('button', { name: 'Search game Wizball from C64 music Top 100' }).click();
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Wizball');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
 
-    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('tab', { name: 'BEST', exact: true }).click();
     await page.getByRole('tab', { name: 'Best games' }).click();
     await page.getByRole('button', { name: 'Search game Swiv from Atari ST Top 100' }).click();
     await expect(page.getByRole('combobox', { name: 'Search field' })).toHaveValue('game');
@@ -49,7 +49,8 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('heading', { name: 'Library Results' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Play SWIV/i }).first()).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('tab', { name: 'BEST', exact: true }).click();
+    await page.getByRole('tab', { name: 'Best games' }).click();
     await page.getByRole('button', { name: 'Search game The Chaos Engine from Amiga Top 100', exact: true }).click();
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('The Chaos Engine');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
@@ -61,12 +62,14 @@ test.describe('Local SNDH library golden path', () => {
         .first(),
     ).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('tab', { name: 'BEST', exact: true }).click();
+    await page.getByRole('tab', { name: 'Best games' }).click();
     await page.getByRole('button', { name: 'Search game Robocop from CPC Top 100' }).click();
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('RoboCop');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
 
-    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('tab', { name: 'BEST', exact: true }).click();
+    await page.getByRole('tab', { name: 'Best games' }).click();
     await page.getByRole('button', { name: 'Search game The Last Ninja from C64 Top 100' }).click();
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Last Ninja');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
@@ -119,6 +122,37 @@ test.describe('Local SNDH library golden path', () => {
     await page.getByRole('button', { name: 'Expand player' }).click();
     await expect(page.getByRole('button', { name: 'Collapse player' })).toBeVisible();
     await expect(player.getByRole('button', { name: 'Next track' })).toBeVisible();
+
+    const ayChannels = player.getByRole('group', { name: 'AY channels' });
+    await expect(ayChannels).toBeVisible();
+    await expect(ayChannels.getByRole('button', { name: 'Mute AY channel A' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await ayChannels.getByRole('button', { name: 'Mute AY channel B' }).click();
+    await expect(ayChannels.getByRole('button', { name: 'Unmute AY channel B' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    const fx = player.getByRole('group', { name: 'Audio enhancement' });
+    await expect(fx.getByRole('button', { name: 'Player modern sound' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    await fx.getByRole('button', { name: 'Player modern sound' }).click();
+    await expect(fx.getByRole('button', { name: 'Player modern sound' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await fx.getByRole('button', { name: 'Hall', exact: true }).click();
+    await expect(fx.getByRole('button', { name: 'Hall', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    const amount = fx.getByRole('slider', { name: 'Player modern sound amount' });
+    await amount.fill('70');
+    await expect(fx.getByText('70')).toBeVisible();
 
     await player.getByRole('button', { name: 'Bookmark Last Ninja' }).click();
     await page.getByRole('tab', { name: 'Bookmarks (1)' }).click();

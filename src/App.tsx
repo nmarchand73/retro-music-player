@@ -398,6 +398,12 @@ function App() {
           }}
           minimized={playerMinimized}
           analyser={player.analyser}
+          channelMutes={player.channelMutes}
+          onChannelMute={player.setChannelMute}
+          audioFx={audioFx}
+          onAudioFxEnabled={setAudioFxEnabled}
+          onAudioFxPreset={setAudioFxPreset}
+          onAudioFxAmount={setAudioFxAmount}
           onPlayPause={handlePlayPause}
           onStop={player.stop}
           onSeek={player.seek}

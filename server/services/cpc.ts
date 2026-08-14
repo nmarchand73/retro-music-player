@@ -1,18 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
+import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const HEADER_BYTES = 4096;
 const SEARCH_LIMIT = 80;
 const EMPTY_SEARCH_LIMIT = 24;
 const INDEX_BATCH = 48;
 const CPC_DETAIL = 'https://sndh.atari.org/';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 export type CpcFormat = 'SNDH' | 'AY' | 'YM';
 
@@ -39,7 +36,7 @@ function archiveRoot(): string {
   if (override) {
     return path.resolve(PROJECT_ROOT, override);
   }
-  return path.join(PROJECT_ROOT, 'data', 'cpc');
+  return path.join(DATA_ROOT, 'cpc');
 }
 
 function pathToId(relativePath: string): string {

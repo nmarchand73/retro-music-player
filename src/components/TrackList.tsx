@@ -97,7 +97,7 @@ function gamesForPlatform(entries: TopGame[], column: PlatformColumn, needle: st
 
 function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void }) {
   const [filter, setFilter] = useState('');
-  const [kind, setKind] = useState<RankingKind>('games');
+  const [kind, setKind] = useState<RankingKind>('music');
   const needle = filter.trim().toLowerCase();
   const columnsDef = platformColumnsFor(kind);
   const entries = topEntriesFor(kind);
@@ -122,18 +122,9 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
     <>
       <header className="panel-header top-games-header">
         <div>
-          <h2>Top Games</h2>
+          <h2>BEST</h2>
           <p className="muted">{headerBlurb}</p>
           <div className="top-games-kind" role="tablist" aria-label="Ranking type">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={kind === 'games'}
-              className={kind === 'games' ? 'is-active' : undefined}
-              onClick={() => setKind('games')}
-            >
-              Best games
-            </button>
             <button
               type="button"
               role="tab"
@@ -143,6 +134,15 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
             >
               Best music
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={kind === 'games'}
+              className={kind === 'games' ? 'is-active' : undefined}
+              onClick={() => setKind('games')}
+            >
+              Best games
+            </button>
           </div>
         </div>
         <label className="search-select top-games-filter">
@@ -150,8 +150,8 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
           <input
             type="search"
             value={filter}
-            aria-label="Filter top games"
-            placeholder="Filter Top Games…"
+            aria-label="Filter best lists"
+            placeholder="Filter Best…"
             onChange={(event) => setFilter(event.target.value)}
           />
         </label>
@@ -260,7 +260,7 @@ function viewHeading(view: LibraryView): string {
     case 'bookmarks':
       return 'Bookmarks';
     case 'top-games':
-      return 'Top Games';
+      return 'BEST';
     case 'insights':
       return 'Insights';
     case 'settings':
@@ -329,7 +329,7 @@ export function TrackList({
         aria-selected={view === 'top-games'}
         onClick={() => onView('top-games')}
       >
-        Top Games
+        BEST
       </button>
       <button
         type="button"

@@ -10,6 +10,10 @@
     "build": "npm run copy-worklets && tsc -b && vite build",
     "copy-worklets": "node scripts/copy-worklets.js",
     "start": "tsx server/index.ts",
+    "desktop": "desktop-venv/bin/python desktop_app.py",
+    "desktop:venv": "python3 -m venv desktop-venv && desktop-venv/bin/python -m pip install -U pip && desktop-venv/bin/python -m pip install -r requirements-desktop.txt",
+    "desktop:build": "bash scripts/build_macos_app.sh",
+    "desktop:open": "open \"dist-mac/Retro Music Player.app\"",
     "lint": "oxlint",
     "preview": "vite preview",
     "smoketest": "playwright test",
@@ -25,6 +29,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.185.1",
+    "tsx": "^4.23.12",
     "ym2149-wasm": "^0.8.1"
   },
   "devDependencies": {
@@ -37,7 +42,6 @@
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
-    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   }

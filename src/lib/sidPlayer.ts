@@ -190,6 +190,12 @@ export class SidPlayer {
     return this.durationSeconds;
   }
 
+  /** Mute SID voice 0..2 on chip 0. */
+  setVoiceMute(voice: number, mute: boolean): void {
+    if (!this.engine || voice < 0 || voice > 2) return;
+    this.engine.mute(0, voice, mute);
+  }
+
   stop(): void {
     if (this.progressTimer != null) {
       window.clearInterval(this.progressTimer);

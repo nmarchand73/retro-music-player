@@ -1,10 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dataPath } from '../paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const CACHE_PATH = path.join(PROJECT_ROOT, 'data', 'cache', 'amiga-durations.json');
+const CACHE_PATH = dataPath('cache', 'amiga-durations.json');
 
 const MOD_TAGS = new Set([
   'M.K.',

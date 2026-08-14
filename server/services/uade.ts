@@ -2,12 +2,10 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { isOpenmptFormat } from '../../src/utils/amigaPlayable.js';
+import { dataPath } from '../paths.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const CACHE_DIR = path.join(PROJECT_ROOT, 'data', 'cache', 'uade');
+const CACHE_DIR = dataPath('cache', 'uade');
 
 /** Soft cap so renders finish in reasonable time for interactive play. */
 const SUBSONG_TIMEOUT_SEC = 180;

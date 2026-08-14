@@ -26,8 +26,15 @@ interface Spectrum3DProps {
 }
 
 const levelsScratch = new Float32Array(BAR_COUNT);
-const lerpA = new THREE.Color();
-const lerpB = new THREE.Color('#7a45e8');
+const peakCream = new THREE.Color('#fff8ee');
+
+/** Same stops as mini-player `useSpectrum` canvas gradient (bottom → top). */
+const SPECTRUM_GRADIENT = [
+  { stop: 0, color: new THREE.Color('#e2185a') },
+  { stop: 0.45, color: new THREE.Color('#d43aa8') },
+  { stop: 0.78, color: new THREE.Color('#7b4ec4') },
+  { stop: 1, color: new THREE.Color('#3d2f8a') },
+] as const;
 
 function groupBinsInto(data: Uint8Array, groups: number, out: Float32Array): void {
   const lo = Math.max(5, Math.floor(data.length * 0.003));
@@ -53,33 +60,113 @@ function groupBinsInto(data: Uint8Array, groups: number, out: Float32Array): voi
   }
 }
 
-function mixBarColor(t: number, energy: number, out: THREE.Color) {
-  out.set('#ff2d6f');
-  out.lerp(lerpB, t * 0.85);
-  out.offsetHSL(0, 0.06 * energy, 0.08 + 0.14 * energy);
+function sampleSpectrumGradient(amount: number, out: THREE.Color): void {
+  const t = Math.min(1, Math.max(0, amount));
+  for (let i = 0; i < SPECTRUM_GRADIENT.length - 1; i += 1) {
+    const a = SPECTRUM_GRADIENT[i]!;
+    const b = SPECTRUM_GRADIENT[i + 1]!;
+    if (t <= b.stop || i === SPECTRUM_GRADIENT.length - 2) {
+      const span = Math.max(1e-6, b.stop - a.stop);
+      const frac = (t - a.stop) / span;
+      out.copy(a.color).lerp(b.color, Math.min(1, Math.max(0, frac)));
+      return;
+    }
+  }
+  out.copy(SPECTRUM_GRADIENT[SPECTRUM_GRADIENT.length - 1]!.color);
 }
 
-const PEAK_PALETTE = [
-  new THREE.Color('#2ec4b6'),
-  new THREE.Color('#4cc9f0'),
-  new THREE.Color('#90e0ef'),
-  new THREE.Color('#fee440'),
-  new THREE.Color('#ff9f1c'),
-  new THREE.Color('#ff6b6b'),
-  new THREE.Color('#f72585'),
-  new THREE.Color('#b5179e'),
-  new THREE.Color('#7b2cbf'),
-  new THREE.Color('#4361ee'),
-];
+function mixTipColor(energy: number, out: THREE.Color) {
+  // Cap color = tip of the bar on the same absolute height ramp as the mini spectrum.
+  sampleSpectrumGradient(Math.min(1, Math.max(FLOOR, energy)), out);
+  out.offsetHSL(0, 0.02 * energy, 0.08 + 0.1 * energy);
+}
 
-function mixPeakColor(t: number, energy: number, time: number, out: THREE.Color) {
-  const n = PEAK_PALETTE.length;
-  const drifting = ((t * n) + time * 0.35) % n;
-  const i0 = Math.floor(drifting) % n;
-  const i1 = (i0 + 1) % n;
-  const frac = drifting - Math.floor(drifting);
-  out.copy(PEAK_PALETTE[i0]!).lerp(PEAK_PALETTE[i1]!, frac);
-  out.offsetHSL(0, 0.04 * energy, 0.08 + 0.16 * energy);
+function mixPeakColor(energy: number, out: THREE.Color) {
+  sampleSpectrumGradient(Math.min(1, Math.max(0.5, energy)), out);
+  out.lerp(peakCream, 0.7 + 0.18 * energy);
+}
+
+/**
+ * Vertical pink→purple ramp keyed to world Y / MAX_HEIGHT — same absolute mapping
+ * as the mini-player canvas gradient (short bars stay pink; tall bars reach purple).
+ */
+function createSpectrumBarMaterial(opts: {
+  metalness?: number;
+  roughness?: number;
+  emissiveIntensity?: number;
+  transparent?: boolean;
+  opacity?: number;
+  depthWrite?: boolean;
+}): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: opts.roughness ?? 0.28,
+    metalness: opts.metalness ?? 0.42,
+    emissive: new THREE.Color('#e2185a'),
+    emissiveIntensity: opts.emissiveIntensity ?? 0.42,
+    transparent: opts.transparent ?? false,
+    opacity: opts.opacity ?? 1,
+    depthWrite: opts.depthWrite ?? !(opts.transparent ?? false),
+  });
+
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uC0 = { value: SPECTRUM_GRADIENT[0]!.color };
+    shader.uniforms.uC1 = { value: SPECTRUM_GRADIENT[1]!.color };
+    shader.uniforms.uC2 = { value: SPECTRUM_GRADIENT[2]!.color };
+    shader.uniforms.uC3 = { value: SPECTRUM_GRADIENT[3]!.color };
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        /* glsl */ `#include <common>
+varying float vGradT;
+varying float vSideShine;`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        /* glsl */ `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  vGradT = clamp((instanceMatrix * vec4(transformed, 1.0)).y / ${MAX_HEIGHT.toFixed(3)}, 0.0, 1.0);
+#else
+  vGradT = clamp(transformed.y / ${MAX_HEIGHT.toFixed(3)}, 0.0, 1.0);
+#endif
+vSideShine = abs(normal.x) * 0.28;`,
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        /* glsl */ `#include <common>
+varying float vGradT;
+varying float vSideShine;
+uniform vec3 uC0;
+uniform vec3 uC1;
+uniform vec3 uC2;
+uniform vec3 uC3;
+vec3 spectrumGrad(float t) {
+  t = clamp(t, 0.0, 1.0);
+  if (t < 0.45) return mix(uC0, uC1, t / 0.45);
+  if (t < 0.78) return mix(uC1, uC2, (t - 0.45) / 0.33);
+  return mix(uC2, uC3, (t - 0.78) / 0.22);
+}`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        /* glsl */ `#include <color_fragment>
+{
+  vec3 g = spectrumGrad(vGradT);
+  diffuseColor.rgb = g + vec3(vSideShine);
+}`,
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        /* glsl */ `#include <emissivemap_fragment>
+totalEmissiveRadiance *= spectrumGrad(vGradT);`,
+      );
+  };
+
+  mat.customProgramCacheKey = () => 'spectrum-bar-grad-v1';
+  return mat;
 }
 
 function barDepth(t: number): number {
@@ -290,13 +377,12 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
       const color = new THREE.Color();
       const peakColor = new THREE.Color();
 
-      const barGeo = new THREE.CylinderGeometry(radius * 0.72, radius, 1, 10, 1, false);
+      const barGeo = new THREE.CylinderGeometry(radius * 0.72, radius, 1, 12, 1, false);
       barGeo.translate(0, 0.5, 0);
-      const barMat = new THREE.MeshStandardMaterial({
+      const barMat = createSpectrumBarMaterial({
         roughness: 0.28,
-        metalness: 0.45,
-        emissive: new THREE.Color(0xe2185a),
-        emissiveIntensity: 0.5,
+        metalness: 0.42,
+        emissiveIntensity: 0.48,
       });
       const bars = new THREE.InstancedMesh(barGeo, barMat, BAR_COUNT);
       bars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -306,16 +392,19 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
       const capMat = new THREE.MeshStandardMaterial({
         roughness: 0.22,
         metalness: 0.55,
-        emissive: new THREE.Color(0xff5a9a),
+        emissive: new THREE.Color(0xd43aa8),
         emissiveIntensity: 0.32,
       });
       const caps = new THREE.InstancedMesh(capGeo, capMat, BAR_COUNT);
       caps.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(caps);
 
-      const mirrorMat = new THREE.MeshBasicMaterial({
+      const mirrorMat = createSpectrumBarMaterial({
+        roughness: 1,
+        metalness: 0,
+        emissiveIntensity: 0.15,
         transparent: true,
-        opacity: 0.1,
+        opacity: 0.12,
         depthWrite: false,
       });
       const mirrorBars = new THREE.InstancedMesh(barGeo, mirrorMat, BAR_COUNT);
@@ -341,11 +430,9 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
         const x = i * spacing - halfWidth;
         const band = i / Math.max(1, BAR_COUNT - 1);
         const z = barDepth(band);
-        mixBarColor(band, 0.2, color);
-        mixPeakColor(band, 0.35, 0, peakColor);
-        bars.setColorAt(i, color);
+        mixTipColor(0.2, color);
+        mixPeakColor(0.35, peakColor);
         caps.setColorAt(i, color);
-        mirrorBars.setColorAt(i, color);
         peaksMesh.setColorAt(i, peakColor);
         dummy.position.set(x, 0, z);
         dummy.scale.set(1, FLOOR, 1);
@@ -359,9 +446,7 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
         dummy.position.set(x, FLOOR * MAX_HEIGHT + radius * 1.1, z);
         peaksMesh.setMatrixAt(i, dummy.matrix);
       }
-      if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
       if (caps.instanceColor) caps.instanceColor.needsUpdate = true;
-      if (mirrorBars.instanceColor) mirrorBars.instanceColor.needsUpdate = true;
       if (peaksMesh.instanceColor) peaksMesh.instanceColor.needsUpdate = true;
       bars.instanceMatrix.needsUpdate = true;
       caps.instanceMatrix.needsUpdate = true;
@@ -449,8 +534,7 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
             }
 
             const x = i * spacing - halfWidth;
-            const band = i / Math.max(1, BAR_COUNT - 1);
-            const z = barDepth(band);
+            const z = barDepth(i / Math.max(1, BAR_COUNT - 1));
             const h = Math.max(FLOOR, boosted) * MAX_HEIGHT;
             const girth = 1 + boosted * 0.28;
             dummy.rotation.set(0, 0, 0);
@@ -460,19 +544,15 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
             bars.setMatrixAt(i, dummy.matrix);
             mirrorBars.setMatrixAt(i, dummy.matrix);
 
-            mixBarColor(band, boosted, color);
-            bars.setColorAt(i, color);
+            mixTipColor(boosted, color);
             caps.setColorAt(i, color);
-            lerpA.copy(color).multiplyScalar(0.55);
-            lerpA.offsetHSL(0, -0.08, 0.18);
-            mirrorBars.setColorAt(i, lerpA);
 
             dummy.position.set(x, h, z);
             dummy.scale.set(girth, girth, girth);
             dummy.updateMatrix();
             caps.setMatrixAt(i, dummy.matrix);
 
-            mixPeakColor(band, boosted, t, peakColor);
+            mixPeakColor(boosted, peakColor);
             peaksMesh.setColorAt(i, peakColor);
 
             const peakScale = 0.9 + boosted * 0.55;
@@ -486,13 +566,12 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
           caps.instanceMatrix.needsUpdate = true;
           mirrorBars.instanceMatrix.needsUpdate = true;
           peaksMesh.instanceMatrix.needsUpdate = true;
-          if (bars.instanceColor) bars.instanceColor.needsUpdate = true;
           if (caps.instanceColor) caps.instanceColor.needsUpdate = true;
-          if (mirrorBars.instanceColor) mirrorBars.instanceColor.needsUpdate = true;
           if (peaksMesh.instanceColor) peaksMesh.instanceColor.needsUpdate = true;
 
           const avgEnergy = energySum / BAR_COUNT;
           barMat.emissiveIntensity = 0.38 + avgEnergy * 0.85;
+          mirrorMat.emissiveIntensity = 0.1 + avgEnergy * 0.2;
           capMat.emissiveIntensity = 0.26 + avgEnergy * 0.6;
           peakMat.emissiveIntensity = 0.9 + avgEnergy * 0.75;
           renderer.toneMappingExposure = 1.06 + avgEnergy * 0.18;

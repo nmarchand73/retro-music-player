@@ -109,6 +109,31 @@ npm run dev
 - Frontend: http://localhost:5173
 - API proxy: http://localhost:3001
 
+## macOS app (MyChat / Chess Insight style)
+
+Double-clickable Cocoa window over the local Express server (pywebview). Requires **Node.js** on PATH and Python 3 for the shell.
+
+**Dev shell** (uses this repo’s `data/` when archives are present):
+
+```bash
+npm run desktop:venv
+npm run build
+npm run desktop
+```
+
+**Build `.app`:**
+
+```bash
+chmod +x scripts/build_macos_app.sh
+npm run desktop:build
+open "dist-mac/Retro Music Player.app"
+# optional: cp -R "dist-mac/Retro Music Player.app" ~/Applications/
+```
+
+- Port default **3010** (so it can sit beside `npm run dev` on 3001); override with `PORT` / `RETRO_MUSIC_PORT`
+- Music dumps: `~/Library/Application Support/Retro Music Player/data` (build script **hardlinks** this checkout’s `data/*` there so Finder launch is not blocked by Documents TCC)
+- Logs: `~/Library/Logs/Retro Music Player.log`
+
 ## Production
 
 ```bash
@@ -125,3 +150,4 @@ Serves the built React app and API from port 3001.
 - `GET /api/track/:source/:id` — track metadata
 - `GET /api/stream/:source/:id` — audio file stream
 - `GET /api/insights` — archive inventory (composers, games, formats, coverage)
+- `GET /api/health` — readiness (`app: retro-music-player`)

@@ -1,8 +1,8 @@
 import cors from 'cors';
 import express from 'express';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { searchLocalCatalog, getLocalTrack } from './data/localCatalog.js';
+import { DATA_ROOT, PROJECT_ROOT } from './paths.js';
 import {
   getAmigaTrack,
   loadAmigaIndex,
@@ -51,8 +51,8 @@ import {
 } from './services/sndh.js';
 import type { DatabaseInfo, MusicPlatform, SearchField, SearchResponse, Track } from './types.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3001;
+const HOST = process.env.RETRO_MUSIC_DESKTOP === '1' ? '127.0.0.1' : '0.0.0.0';
 
 const app = express();
 app.use(cors());
@@ -99,6 +99,7 @@ app.get('/api/health', async (_req, res) => {
     isUadeAvailable(),
   ]);
   res.json({
+    app: 'retro-music-player',
     ok: true,
     sndhLocal: sndh,
     amigaLocal: amiga,
@@ -556,7 +557,7 @@ app.get('/api/stream/:source/:id', async (req, res) => {
   }
 });
 
-const distPath = path.join(__dirname, '..', 'dist');
+const distPath = path.join(PROJECT_ROOT, 'dist');
 app.use(express.static(distPath));
 app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
@@ -569,8 +570,9 @@ const [sndhIndex, amigaIndex, cpcIndex, c64Index, uade] = await Promise.all([
   loadC64Index(),
   isUadeAvailable(),
 ]);
-app.listen(PORT, () => {
-  console.log(`Retro Music Player API on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Retro Music Player API on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  console.log(`Data dir: ${DATA_ROOT}`);
   console.log(
     sndhIndex.length > 0
       ? `Local SNDH archive: ${sndhIndex.length.toLocaleString('en-US')} files`

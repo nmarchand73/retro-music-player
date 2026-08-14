@@ -53,7 +53,7 @@ test.describe('Machine settings defaults', () => {
     await preset.selectOption('hall');
     await expect(preset).toHaveValue('hall');
 
-    const amount = page.getByRole('slider', { name: 'Modern sound amount' });
+    const amount = page.getByRole('slider', { name: 'Modern sound amount', exact: true });
     await amount.fill('80');
     await expect(page.getByText(/Amount · 80%/)).toBeVisible();
 

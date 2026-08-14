@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { BookmarkButton } from './BookmarkButton';
 import { MarqueeText } from './MarqueeText';
 import { MiniSpectrum } from './MiniSpectrum';
 import { Spectrum3D } from './Spectrum3D';
 import { TrackCover } from './TrackCover';
-import type { PlayerStatus } from '../hooks/useMusicPlayer';
+import type { ChipChannelMutes, PlayerStatus } from '../hooks/useMusicPlayer';
+import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
 import type { Track } from '../types';
 import { formatClock, formatDuration } from '../utils/formatTime';
 
@@ -24,6 +25,10 @@ function playerPlatformLabel(platform: Track['platform']): string {
     }
   }
 }
+
+const YM_CHANNEL_LABELS = ['A', 'B', 'C'] as const;
+const SID_CHANNEL_LABELS = ['1', '2', '3'] as const;
+
 interface PlayerBarProps {
   track: Track | null;
   status: PlayerStatus;
@@ -41,6 +46,192 @@ interface PlayerBarProps {
   onToggleBookmark: () => void;
   minimized: boolean;
   analyser: AnalyserNode | null;
+  channelMutes: ChipChannelMutes | null;
+  onChannelMute: (index: 0 | 1 | 2, mute: boolean) => void;
+  audioFx: AudioFxSettings;
+  onAudioFxEnabled: (enabled: boolean) => void;
+  onAudioFxPreset: (preset: FxPreset) => void;
+  onAudioFxAmount: (amount: number) => void;
+}
+
+function ChannelMuteControls({
+  channelMutes,
+  onChannelMute,
+  compact = false,
+}: {
+  channelMutes: ChipChannelMutes;
+  onChannelMute: (index: 0 | 1 | 2, mute: boolean) => void;
+  compact?: boolean;
+}) {
+  const labels = channelMutes.kind === 'ym' ? YM_CHANNEL_LABELS : SID_CHANNEL_LABELS;
+  const kindLabel = channelMutes.kind === 'ym' ? 'AY channel' : 'SID voice';
+  return (
+    <div
+      className={`player-channel-mutes${compact ? ' is-compact' : ''}`}
+      role="group"
+      aria-label={channelMutes.kind === 'ym' ? 'AY channels' : 'SID voices'}
+    >
+      {!compact ? <span className="player-channel-mutes-label">Channels</span> : null}
+      {labels.map((label, index) => {
+        const muted = channelMutes.muted[index]!;
+        const channelIndex = index as 0 | 1 | 2;
+        return (
+          <button
+            key={label}
+            type="button"
+            className={`player-channel-mute${muted ? ' is-muted' : ''}`}
+            aria-pressed={!muted}
+            aria-label={muted ? `Unmute ${kindLabel} ${label}` : `Mute ${kindLabel} ${label}`}
+            onClick={() => onChannelMute(channelIndex, !muted)}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlayerFxRail({
+  audioFx,
+  onAudioFxEnabled,
+  onAudioFxPreset,
+  onAudioFxAmount,
+  compact = false,
+}: {
+  audioFx: AudioFxSettings;
+  onAudioFxEnabled: (enabled: boolean) => void;
+  onAudioFxPreset: (preset: FxPreset) => void;
+  onAudioFxAmount: (amount: number) => void;
+  compact?: boolean;
+}) {
+  const fxLive = audioFx.enabled && audioFx.preset !== 'authentic';
+  const activePreset: 'modern' | 'hall' = audioFx.preset === 'hall' ? 'hall' : 'modern';
+  const percent = Math.round(audioFx.amount * 100);
+  const amountStyle = { '--fx-amount': `${percent}%` } as CSSProperties;
+
+  const toggleModern = () => {
+    if (fxLive) {
+      onAudioFxEnabled(false);
+      return;
+    }
+    onAudioFxEnabled(true);
+    if (audioFx.preset === 'authentic') onAudioFxPreset('modern');
+  };
+
+  if (compact) {
+    return (
+      <div
+        className={`player-fx-rail is-compact${fxLive ? ' is-live' : ''}`}
+        role="group"
+        aria-label="Modern sound"
+      >
+        <button
+          type="button"
+          className={`player-fx-switch${fxLive ? ' is-on' : ''}`}
+          aria-pressed={fxLive}
+          aria-label="Player modern sound"
+          onClick={toggleModern}
+        >
+          <span className="player-fx-switch-knob" aria-hidden="true" />
+          <span className="player-fx-switch-copy">
+            <span className="player-fx-switch-title">FX</span>
+            <span className="player-fx-switch-meta">{fxLive ? `${percent}%` : 'Off'}</span>
+          </span>
+        </button>
+        {fxLive ? (
+          <label className="player-fx-amount is-compact">
+            <span className="visually-hidden">Player modern sound amount</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={percent}
+              aria-label="Player modern sound amount"
+              style={amountStyle}
+              onChange={(event) => onAudioFxAmount(Number(event.target.value) / 100)}
+            />
+          </label>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`player-fx-rail${fxLive ? ' is-live' : ''}`}
+      role="group"
+      aria-label="Audio enhancement"
+    >
+      <div className="player-fx-rail-main">
+        <button
+          type="button"
+          className={`player-fx-switch${fxLive ? ' is-on' : ''}`}
+          aria-pressed={fxLive}
+          aria-label="Player modern sound"
+          onClick={toggleModern}
+        >
+          <span className="player-fx-switch-knob" aria-hidden="true" />
+          <span className="player-fx-switch-copy">
+            <span className="player-fx-switch-title">Modern</span>
+            <span className="player-fx-switch-meta">{fxLive ? 'Enhanced' : 'Authentic'}</span>
+          </span>
+        </button>
+
+        <div
+          className={`player-fx-presets${fxLive ? '' : ' is-disabled'}`}
+          role="group"
+          aria-label="Player audio FX preset"
+        >
+          <button
+            type="button"
+            className={activePreset === 'modern' && fxLive ? 'is-active' : undefined}
+            aria-pressed={fxLive && activePreset === 'modern'}
+            disabled={!fxLive}
+            onClick={() => onAudioFxPreset('modern')}
+          >
+            Studio
+          </button>
+          <button
+            type="button"
+            className={activePreset === 'hall' && fxLive ? 'is-active' : undefined}
+            aria-pressed={fxLive && activePreset === 'hall'}
+            disabled={!fxLive}
+            onClick={() => onAudioFxPreset('hall')}
+          >
+            Hall
+          </button>
+        </div>
+
+        <label className={`player-fx-amount${fxLive ? '' : ' is-disabled'}`}>
+          <span className="player-fx-amount-readout" aria-hidden="true">
+            {percent}
+            <small>%</small>
+          </span>
+          <span className="visually-hidden">Player modern sound amount</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={percent}
+            disabled={!fxLive}
+            aria-label="Player modern sound amount"
+            style={amountStyle}
+            onChange={(event) => onAudioFxAmount(Number(event.target.value) / 100)}
+          />
+        </label>
+      </div>
+      <p className="player-fx-hint">
+        {fxLive
+          ? activePreset === 'hall'
+            ? 'Wider room · soft plate · air'
+            : 'EQ · glue · exciter · mid-side width'
+          : 'Dry chip output — flip Modern to enhance'}
+      </p>
+    </div>
+  );
 }
 
 export function PlayerBar({
@@ -60,6 +251,12 @@ export function PlayerBar({
   onToggleBookmark,
   minimized,
   analyser,
+  channelMutes,
+  onChannelMute,
+  audioFx,
+  onAudioFxEnabled,
+  onAudioFxPreset,
+  onAudioFxAmount,
 }: PlayerBarProps) {
   const canSeek = duration > 0;
   const showPause = status === 'playing';
@@ -114,6 +311,16 @@ export function PlayerBar({
     </div>
   );
 
+  const fxRail = (
+    <PlayerFxRail
+      audioFx={audioFx}
+      onAudioFxEnabled={onAudioFxEnabled}
+      onAudioFxPreset={onAudioFxPreset}
+      onAudioFxAmount={onAudioFxAmount}
+      compact={minimized}
+    />
+  );
+
   if (minimized) {
     return (
       <footer className="player-bar is-minimized" aria-label="Player">
@@ -141,6 +348,14 @@ export function PlayerBar({
         <MiniSpectrum analyser={analyser} playing={playing} />
 
         <div className="player-controls">
+          {fxRail}
+          {channelMutes ? (
+            <ChannelMuteControls
+              channelMutes={channelMutes}
+              onChannelMute={onChannelMute}
+              compact
+            />
+          ) : null}
           <button
             type="button"
             className="player-play"
@@ -236,6 +451,10 @@ export function PlayerBar({
             <StopIcon />
           </button>
         </div>
+        {channelMutes ? (
+          <ChannelMuteControls channelMutes={channelMutes} onChannelMute={onChannelMute} />
+        ) : null}
+        {fxRail}
         {seekControls}
       </div>
     </footer>

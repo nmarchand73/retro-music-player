@@ -82,6 +82,14 @@ function copyOrResample(source: Float32Array, target: Float32Array): void {
 
 export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
+/** Chip channel mute state for YM (A/B/C) or SID (1/2/3). */
+export type ChipChannelMutes = {
+  kind: 'ym' | 'sid';
+  muted: [boolean, boolean, boolean];
+};
+
+const OPEN_CHANNELS: ChipChannelMutes['muted'] = [false, false, false];
+
 interface PlayerState {
   status: PlayerStatus;
   currentTrack: Track | null;
@@ -91,6 +99,7 @@ interface PlayerState {
   trackerSong: TrackerSong | null;
   trackerPlayback: TrackerPlayback | null;
   analyser: AnalyserNode | null;
+  channelMutes: ChipChannelMutes | null;
 }
 
 let ymInitPromise: Promise<void> | null = null;
@@ -117,6 +126,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
     trackerSong: null,
     trackerPlayback: null,
     analyser: null,
+    channelMutes: null,
   });
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -279,6 +289,10 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
     const analyser = connectThroughFx(scriptNode, ctx, hint);
     ymNodeRef.current = scriptNode;
 
+    for (let channel = 0; channel < 3; channel += 1) {
+      player.set_channel_mute(channel, false);
+    }
+
     progressTimerRef.current = window.setInterval(() => {
       const current = ymPlayerRef.current;
       if (!current) return;
@@ -319,7 +333,13 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       }));
     }, 200);
 
-    setState((prev) => ({ ...prev, status: 'playing', duration: duration ?? 0, analyser }));
+    setState((prev) => ({
+      ...prev,
+      status: 'playing',
+      duration: duration ?? 0,
+      analyser,
+      channelMutes: { kind: 'ym', muted: [...OPEN_CHANNELS] },
+    }));
   }, [connectThroughFx]);
 
   const playWav = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
@@ -362,6 +382,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       trackerSong: null,
       trackerPlayback: null,
       analyser,
+      channelMutes: null,
     }));
   }, [connectThroughFx]);
 
@@ -414,6 +435,9 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       bus,
       fxSettingsRef.current,
     );
+    for (let voice = 0; voice < 3; voice += 1) {
+      player.setVoiceMute(voice, false);
+    }
     setState((prev) => ({
       ...prev,
       status: 'playing',
@@ -421,6 +445,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       trackerSong: null,
       trackerPlayback: null,
       analyser,
+      channelMutes: { kind: 'sid', muted: [...OPEN_CHANNELS] },
     }));
   }, [ensureFxBus]);
 
@@ -441,6 +466,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
             duration: Number(meta.dur ?? player.duration ?? 0),
             trackerSong: toTrackerSong(meta as { song?: TrackerSong }),
             analyser,
+            channelMutes: null,
           }));
         });
         player.onEnded(() => {
@@ -465,7 +491,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
           }));
         });
         player.play(arrayBuffer);
-        setState((prev) => ({ ...prev, status: 'playing', analyser }));
+        setState((prev) => ({ ...prev, status: 'playing', analyser, channelMutes: null }));
         resolve();
       });
       return;
@@ -486,6 +512,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
         trackerSong: null,
         trackerPlayback: null,
         analyser: null,
+        channelMutes: null,
       });
 
       try {
@@ -598,8 +625,42 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       trackerSong: null,
       trackerPlayback: null,
       analyser: null,
+      channelMutes: null,
     });
   }, [stopAll]);
+
+  const setChannelMute = useCallback((index: 0 | 1 | 2, mute: boolean) => {
+    const ym = ymPlayerRef.current;
+    if (ym) {
+      ym.set_channel_mute(index, mute);
+      setState((prev) => {
+        if (!prev.channelMutes || prev.channelMutes.kind !== 'ym') {
+          const muted: ChipChannelMutes['muted'] = [...OPEN_CHANNELS];
+          muted[index] = mute;
+          return { ...prev, channelMutes: { kind: 'ym', muted } };
+        }
+        const muted: ChipChannelMutes['muted'] = [...prev.channelMutes.muted];
+        muted[index] = mute;
+        return { ...prev, channelMutes: { kind: 'ym', muted } };
+      });
+      return;
+    }
+
+    const sid = sidPlayerRef.current;
+    if (sid) {
+      sid.setVoiceMute(index, mute);
+      setState((prev) => {
+        if (!prev.channelMutes || prev.channelMutes.kind !== 'sid') {
+          const muted: ChipChannelMutes['muted'] = [...OPEN_CHANNELS];
+          muted[index] = mute;
+          return { ...prev, channelMutes: { kind: 'sid', muted } };
+        }
+        const muted: ChipChannelMutes['muted'] = [...prev.channelMutes.muted];
+        muted[index] = mute;
+        return { ...prev, channelMutes: { kind: 'sid', muted } };
+      });
+    }
+  }, []);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioElRef.current;
@@ -675,5 +736,5 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
 
   useEffect(() => () => stopAll(), [stopAll]);
 
-  return { ...state, playTrack, pause, resume, stop, seek, setOnEnded };
+  return { ...state, playTrack, pause, resume, stop, seek, setChannelMute, setOnEnded };
 }

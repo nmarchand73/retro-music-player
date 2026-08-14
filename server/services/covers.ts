@@ -1,11 +1,8 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { loadAmigaIndex } from './amiga.js';
 import { normalizeGameKey } from '../searchQuery.js';
 import type { Track } from '../types.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
+import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 interface GameCover {
   key: string;
@@ -18,7 +15,7 @@ let cached: { map: Map<string, GameCover>; from: unknown } | null = null;
 function amigaRoot(): string {
   const override = process.env.AMIGA_ARCHIVE_DIR?.trim();
   if (override) return path.resolve(PROJECT_ROOT, override);
-  return path.join(PROJECT_ROOT, 'data', 'amiga');
+  return path.join(DATA_ROOT, 'amiga');
 }
 
 function expandKeys(value: string): string[] {

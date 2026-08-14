@@ -1,19 +1,16 @@
 import * as cheerio from 'cheerio';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
+import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const SNDH_BASE = 'https://sndh.atari.org';
 const HEADER_BYTES = 4096;
 const SEARCH_LIMIT = 80;
 const EMPTY_SEARCH_LIMIT = 24;
 const INDEX_BATCH = 48;
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 export interface SndhRecord {
   id: string;
@@ -37,7 +34,7 @@ function archiveRoot(): string {
   if (override) {
     return path.resolve(PROJECT_ROOT, override);
   }
-  return path.join(PROJECT_ROOT, 'data', 'sndh', 'sndh_lf');
+  return path.join(DATA_ROOT, 'sndh', 'sndh_lf');
 }
 
 function pathToId(relativePath: string): string {

@@ -1,7 +1,6 @@
 import { watch } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { isAmigaFormatPlayable } from '../../src/utils/amigaPlayable.js';
@@ -11,13 +10,11 @@ import {
   rememberAmigaDuration,
 } from './amigaDuration.js';
 import { isUadeAvailable } from './uade.js';
+import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const SEARCH_LIMIT = 80;
 const EMPTY_SEARCH_LIMIT = 24;
 const UNEXOTICA_URL = 'https://www.exotica.org.uk/wiki/UnExoticA';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 const ARCHIVE_EXT = new Set(['.lha', '.lzh', '.lzx', '.zip', '.rar', '.gz', '.7z']);
 const SKIP_EXT = new Set([
@@ -208,7 +205,7 @@ function archiveRoot(): string {
   if (override) {
     return path.resolve(PROJECT_ROOT, override);
   }
-  return path.join(PROJECT_ROOT, 'data', 'amiga');
+  return path.join(DATA_ROOT, 'amiga');
 }
 
 function pathToId(relativePath: string): string {
