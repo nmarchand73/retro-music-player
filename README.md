@@ -14,7 +14,16 @@ A React front-end music library and player for **Atari ST** YM2149 chiptunes and
 ## Playback Engines
 
 - **Atari ST SNDH**: [ym2149-wasm](https://github.com/slippyex/ym2149-rs)
-- **Amiga modules**: [chiptune3](https://github.com/jsschelling/chiptune3) / libopenmpt
+- **Amiga trackers (MOD/XM/…)**: [chiptune3](https://github.com/jsschelling/chiptune3) / libopenmpt
+- **Amiga exotic formats (CUST/MDAT/RJP/AGI/…)**: [UADE](http://zakalwe.fi/uade/) via `uade123` on the server (renders to WAV)
+
+Install UADE for full UnExoticA coverage:
+
+```bash
+brew install uade
+```
+
+Optional override: `UADE_BIN=/path/to/uade123`. Without UADE, only openmpt-compatible modules play.
 
 ## Setup
 

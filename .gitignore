@@ -16,6 +16,7 @@ scripts/.venv/
 # Local music dumps
 data/sndh/
 data/amiga/
+data/cache/
 
 # Editor directories and files
 .vscode/*

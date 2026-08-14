@@ -26,12 +26,28 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('tab', { name: 'Top Games' })).toBeVisible();
     await page.getByRole('tab', { name: 'Top Games' }).click();
     await expect(page.getByRole('heading', { name: 'Top Games' })).toBeVisible();
-    await page.getByRole('button', { name: 'Search game Last Ninja' }).click();
+    await expect(page.getByRole('heading', { name: 'Lemon' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'AtariM' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Music' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Taddei' })).toBeVisible();
+    await page.getByRole('button', { name: 'Search game Last Ninja in AtariM' }).click();
     await expect(page.getByRole('combobox', { name: 'Search field' })).toHaveValue('game');
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Last Ninja');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
+    await expect(page.getByRole('checkbox', { name: 'Playable only' })).not.toBeChecked();
     await expect(page.getByRole('heading', { name: 'Library Results' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Play Last Ninja/i }).first()).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Top Games' }).click();
+    await page.getByRole('button', { name: 'Search game The Chaos Engine in Lemon' }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('The Chaos Engine');
+    await expect(
+      page
+        .locator('.track-list li')
+        .filter({ has: page.locator('[data-platform="amiga"]') })
+        .filter({ hasText: /Chaos Engine/i })
+        .first(),
+    ).toBeVisible();
 
     await page.getByRole('combobox', { name: 'Search field' }).selectOption('any');
     await page.getByRole('searchbox', { name: 'Search music' }).fill('ninja mad');
@@ -39,7 +55,7 @@ test.describe('Local SNDH library golden path', () => {
 
     await expect(page.getByRole('heading', { name: 'Library Results' })).toBeVisible();
     await expect(page.getByRole('combobox', { name: 'Sort' })).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: 'Playable only' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Playable only' })).not.toBeChecked();
     await expect(page.getByRole('button', { name: /Play Last Ninja/i }).first()).toBeVisible();
 
     await page.getByRole('searchbox', { name: 'Search music' }).fill('Last Ninja');
@@ -102,6 +118,7 @@ test.describe('Local SNDH library golden path', () => {
 
     await expect(page.getByRole('heading', { name: 'UnExoticA' })).toBeVisible();
     await expect(page.getByText(/local Amiga modules/)).toBeVisible();
+    await expect(page.getByText(/UADE on/i)).toBeVisible();
 
     await page.getByRole('combobox', { name: 'Platform' }).selectOption('amiga');
     await page.getByRole('searchbox', { name: 'Search music' }).fill('anarchy norrish');
@@ -149,6 +166,30 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
     const bookmarkArt = page.locator('.track-list li').filter({ hasText: 'anarchy2' }).getByRole('img', { name: /Anarchy box/i });
     await expectBoxScan(page, bookmarkArt, 'Anarchy');
+  });
+
+  test('play an exotic Amiga format through UADE', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/');
+
+    await expect(page.getByText(/UADE on/i)).toBeVisible();
+    await page.getByRole('combobox', { name: 'Platform' }).selectOption('amiga');
+    await page.getByRole('combobox', { name: 'Search field' }).selectOption('game');
+    await page.getByRole('searchbox', { name: 'Search music' }).fill('Agony');
+    await page.getByRole('checkbox', { name: 'Playable only' }).check();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+    const custRow = page
+      .locator('.track-list li')
+      .filter({ has: page.locator('[data-platform="amiga"]') })
+      .filter({ hasText: /CUST/i })
+      .first();
+    await expect(custRow).toBeVisible({ timeout: 15_000 });
+    await custRow.getByRole('button', { name: /Play /i }).click();
+
+    const player = page.getByRole('contentinfo', { name: 'Player' });
+    await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('region', { name: 'Tracker pattern' })).toHaveCount(0);
   });
 
   test('show the UnExoticA box scan on the Atari version of the same game', async ({ page }) => {

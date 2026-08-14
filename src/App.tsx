@@ -19,6 +19,7 @@ function App() {
   const [field, setField] = useState<SearchField>('any');
   const [sort, setSort] = useState<SortKey>('match');
   const [playableOnly, setPlayableOnly] = useState(true);
+  const [uadeAvailable, setUadeAvailable] = useState(false);
   const [view, setView] = useState<LibraryView>('library');
   const [playerMinimized, setPlayerMinimized] = useState(true);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -35,8 +36,8 @@ function App() {
     const source = view === 'bookmarks' ? bookmarks : tracks;
     const sorted =
       view === 'bookmarks' && sort === 'match' ? source : sortTracks(source, sort, query);
-    return playableOnly ? sorted.filter(isTrackPlayable) : sorted;
-  }, [bookmarks, playableOnly, query, sort, tracks, view]);
+    return playableOnly ? sorted.filter((track) => isTrackPlayable(track, uadeAvailable)) : sorted;
+  }, [bookmarks, playableOnly, query, sort, tracks, uadeAvailable, view]);
   tracksRef.current = visibleTracks;
   currentRef.current = player.currentTrack;
   playRef.current = player.playTrack;
@@ -66,6 +67,13 @@ function App() {
       .then(setDatabases)
       .catch(() => setDatabases([]))
       .finally(() => setDbLoading(false));
+
+    fetch('/api/health')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { uade?: boolean } | null) => {
+        if (data && typeof data.uade === 'boolean') setUadeAvailable(data.uade);
+      })
+      .catch(() => setUadeAvailable(false));
   }, []);
 
   useEffect(() => {
@@ -123,6 +131,8 @@ function App() {
     if (search.query !== undefined) setQuery(search.query);
     if (search.field !== undefined) setField(search.field);
     if (search.platform !== undefined) setPlatform(search.platform);
+    // Amiga UnExoticA often uses custom formats; show them when browsing by game.
+    if (search.field === 'game') setPlayableOnly(false);
   }, []);
 
   const handleSubmit = (event: FormEvent) => {
@@ -317,6 +327,7 @@ function App() {
             if (player.currentTrack) toggleBookmark(player.currentTrack);
           }}
           minimized={playerMinimized}
+          analyser={player.analyser}
           onPlayPause={handlePlayPause}
           onStop={player.stop}
           onSeek={player.seek}

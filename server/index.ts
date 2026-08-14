@@ -13,6 +13,11 @@ import {
 } from './services/amiga.js';
 import { attachGameCover, attachGameCovers, resolveGameCoverPath } from './services/covers.js';
 import {
+  isUadeAvailable,
+  renderAmigaWithUade,
+  shouldUseUade,
+} from './services/uade.js';
+import {
   findLocalSndhByTitle,
   getSndhTrack,
   loadSndhIndex,
@@ -41,16 +46,17 @@ async function loadLiveTrack(source: string, id: string): Promise<Track | null> 
 }
 
 app.get('/api/health', async (_req, res) => {
-  const [sndh, amiga] = await Promise.all([localSndhStats(), localAmigaStats()]);
+  const [sndh, amiga, uade] = await Promise.all([localSndhStats(), localAmigaStats(), isUadeAvailable()]);
   res.json({
     ok: true,
     sndhLocal: sndh,
     amigaLocal: amiga,
+    uade,
   });
 });
 
 app.get('/api/databases', async (_req, res) => {
-  const [sndh, amiga] = await Promise.all([localSndhStats(), localAmigaStats()]);
+  const [sndh, amiga, uade] = await Promise.all([localSndhStats(), localAmigaStats(), isUadeAvailable()]);
   const databases: DatabaseInfo[] = [
     {
       id: 'sndh',
@@ -70,14 +76,16 @@ app.get('/api/databases', async (_req, res) => {
       id: 'amiga',
       name: 'UnExoticA',
       description: amiga.connected
-        ? 'Local Amiga game music from UnExoticA. New extracts under data/amiga are picked up automatically.'
+        ? uade
+          ? 'Local UnExoticA music — MOD via openmpt, exotic formats via UADE.'
+          : 'Local UnExoticA music — MOD via openmpt. Install UADE (brew install uade) for CUST/MDAT/RJP/…'
         : 'Place UnExoticA extracts in data/amiga/unexotica (see scripts/fetch-unexotica.py).',
       platform: 'amiga',
       url: 'https://www.exotica.org.uk/wiki/UnExoticA',
       connected: amiga.connected,
       requiresKey: false,
       stats: amiga.connected
-        ? `${amiga.count.toLocaleString('en-US')} local Amiga modules`
+        ? `${amiga.count.toLocaleString('en-US')} local Amiga modules${uade ? ' · UADE on' : ' · UADE off'}`
         : 'Archive missing',
     },
     {
@@ -262,7 +270,36 @@ app.get('/api/stream/:source/:id', async (req, res) => {
         res.status(404).json({ error: 'Amiga track not found' });
         return;
       }
+
+      const track = await getAmigaTrack(id);
+      const format = track?.format ?? '';
+      const forceRaw = String(req.query.raw ?? '') === '1';
+      const wantUade = !forceRaw && shouldUseUade(format) && (await isUadeAvailable());
+
+      if (wantUade) {
+        try {
+          const wavPath = await renderAmigaWithUade(localPath);
+          res.setHeader('Content-Type', 'audio/wav');
+          res.setHeader('X-Playback-Engine', 'uade');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.sendFile(wavPath);
+          return;
+        } catch (error) {
+          console.warn(
+            '[uade]',
+            track?.title ?? id,
+            error instanceof Error ? error.message : error,
+          );
+          res.status(415).json({
+            error: error instanceof Error ? error.message : 'UADE could not render this module',
+          });
+          return;
+        }
+      }
+
       res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('X-Playback-Engine', 'openmpt');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.sendFile(localPath);
       return;
@@ -324,7 +361,11 @@ app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-const [sndhIndex, amigaIndex] = await Promise.all([loadSndhIndex(), loadAmigaIndex()]);
+const [sndhIndex, amigaIndex, uade] = await Promise.all([
+  loadSndhIndex(),
+  loadAmigaIndex(),
+  isUadeAvailable(),
+]);
 app.listen(PORT, () => {
   console.log(`Retro Music Player API on http://localhost:${PORT}`);
   console.log(
@@ -337,4 +378,5 @@ app.listen(PORT, () => {
       ? `Local Amiga archive: ${amigaIndex.length.toLocaleString('en-US')} modules`
       : 'No local Amiga archive — extract UnExoticA packs into data/amiga/unexotica',
   );
+  console.log(uade ? 'UADE: available (exotic Amiga formats)' : 'UADE: not found — brew install uade');
 });

@@ -60,11 +60,17 @@ const OPENMPT_FORMATS = new Set([
   'XM',
 ]);
 
-export function isAmigaFormatPlayable(format: string): boolean {
+export function isOpenmptFormat(format: string): boolean {
   return OPENMPT_FORMATS.has(format.trim().toUpperCase());
 }
 
-export function isTrackPlayable(track: Track): boolean {
+/** @deprecated Prefer isOpenmptFormat; kept for call sites during hybrid UADE rollout. */
+export function isAmigaFormatPlayable(format: string, uadeAvailable = false): boolean {
+  if (isOpenmptFormat(format)) return true;
+  return uadeAvailable;
+}
+
+export function isTrackPlayable(track: Track, uadeAvailable = false): boolean {
   if (track.platform !== 'amiga') return true;
-  return isAmigaFormatPlayable(track.format);
+  return isAmigaFormatPlayable(track.format, uadeAvailable);
 }

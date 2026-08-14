@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { BookmarkButton } from './BookmarkButton';
+import { MiniSpectrum } from './MiniSpectrum';
 import { TrackCover } from './TrackCover';
 import type { PlayerStatus } from '../hooks/useMusicPlayer';
 import type { Track } from '../types';
@@ -21,6 +22,7 @@ interface PlayerBarProps {
   bookmarked: boolean;
   onToggleBookmark: () => void;
   minimized: boolean;
+  analyser: AnalyserNode | null;
 }
 
 export function PlayerBar({
@@ -39,6 +41,7 @@ export function PlayerBar({
   bookmarked,
   onToggleBookmark,
   minimized,
+  analyser,
 }: PlayerBarProps) {
   const canSeek = duration > 0;
   const showPause = status === 'playing';
@@ -78,6 +81,8 @@ export function PlayerBar({
           )}
           {error && <span className="player-error">{error}</span>}
         </div>
+
+        <MiniSpectrum analyser={analyser} playing={status === 'playing'} />
 
         <div className="player-controls">
           <button

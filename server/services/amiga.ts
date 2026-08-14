@@ -2,9 +2,10 @@ import { watch } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { matchesAllTokens, searchTokens } from '../searchQuery.js';
+import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { isAmigaFormatPlayable } from '../../src/utils/amigaPlayable.js';
+import { isUadeAvailable } from './uade.js';
 
 const SEARCH_LIMIT = 80;
 const EMPTY_SEARCH_LIMIT = 24;
@@ -209,7 +210,22 @@ function pathToId(relativePath: string): string {
 }
 
 function prettyName(value: string): string {
-  return value.replaceAll('_', ' ').replaceAll(/\s+/g, ' ').trim();
+  return expandUnexoticaName(value.replaceAll('_', ' ').replaceAll(/\s+/g, ' ').trim());
+}
+
+/** Expand UnExoticA path abbreviations so Top Games titles match indexed `game`. */
+function expandUnexoticaName(value: string): string {
+  return value
+    .replace(/\bo t\b/gi, 'of the')
+    .replace(/\bf t\b/gi, 'from the')
+    .replace(/\bw t\b/gi, 'with the')
+    .replace(/\ba t\b/gi, 'and the')
+    .replace(/\bi t\b/gi, 'in the')
+    .replace(/\bb t\b/gi, 'by the')
+    .replace(/\bMiss\b/g, 'Mission')
+    .replace(/\bHot-Shot\b/gi, 'Hot Shot')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function watchArchive(): void {
@@ -495,11 +511,19 @@ function scoreRecord(record: AmigaRecord, query: string, field: SearchField): nu
   const tokens = searchTokens(query);
   if (tokens.length === 0) return 1;
 
-  const phrase = query.trim().toLowerCase();
-  const title = record.title.toLowerCase();
-  const artist = record.artist.toLowerCase();
-  const game = (record.game ?? '').toLowerCase();
+  const phrase = normalizeGameKey(query);
+  const title = normalizeGameKey(record.title);
+  const artist = normalizeGameKey(record.artist);
+  const game = normalizeGameKey(record.game ?? '');
   const haystack = recordHaystack(record, field);
+
+  if (field === 'game' || field === 'any') {
+    if (matchesNormalizedGame(query, record.game)) {
+      if (game === phrase) return 100;
+      if (game.startsWith(phrase) || phrase.startsWith(game)) return 92;
+      return 88;
+    }
+  }
 
   if (!matchesAllTokens(haystack, tokens)) return 0;
 
@@ -518,11 +542,12 @@ export async function searchAmiga(
   const index = await loadAmigaIndex();
   const q = query.trim();
   const limit = q ? SEARCH_LIMIT : EMPTY_SEARCH_LIMIT;
+  const uadeAvailable = playableOnly ? await isUadeAvailable() : false;
 
   const ranked = index
     .map((record) => ({ record, score: scoreRecord(record, q, field) }))
     .filter((entry) => entry.score > 0)
-    .filter((entry) => !playableOnly || isAmigaFormatPlayable(entry.record.format))
+    .filter((entry) => !playableOnly || isAmigaFormatPlayable(entry.record.format, uadeAvailable))
     .sort((a, b) => b.score - a.score || a.record.title.localeCompare(b.record.title));
 
   return ranked.slice(0, limit).map((entry) => toTrack(entry.record));

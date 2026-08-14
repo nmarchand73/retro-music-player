@@ -114,6 +114,9 @@ export function useMusicPlayer() {
   const trackerRef = useRef<TrackerPlayer | null>(null);
   const ymPlayerRef = useRef<Ym2149Player | null>(null);
   const ymNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const audioObjectUrlRef = useRef<string | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const ymPausedRef = useRef(false);
   const ymDurationRef = useRef<number | null>(null);
   const ymRateRef = useRef(50);
@@ -152,6 +155,23 @@ export function useMusicPlayer() {
       ymPlayerRef.current = null;
     }
 
+    if (audioElRef.current) {
+      audioElRef.current.onended = null;
+      audioElRef.current.ontimeupdate = null;
+      audioElRef.current.pause();
+      audioElRef.current.removeAttribute('src');
+      audioElRef.current.load();
+      audioElRef.current = null;
+    }
+    if (mediaSourceRef.current) {
+      mediaSourceRef.current.disconnect();
+      mediaSourceRef.current = null;
+    }
+    if (audioObjectUrlRef.current) {
+      URL.revokeObjectURL(audioObjectUrlRef.current);
+      audioObjectUrlRef.current = null;
+    }
+
     ymDurationRef.current = null;
     ymSamplesOutRef.current = 0;
     endedRef.current = false;
@@ -180,6 +200,12 @@ export function useMusicPlayer() {
     ymSamplesOutRef.current = 0;
     ymOutputRateRef.current = YM_SAMPLE_RATE;
 
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.22;
+    analyser.minDecibels = -92;
+    analyser.maxDecibels = -18;
+
     const bufferSize = 2048;
     const scriptNode = ctx.createScriptProcessor(bufferSize, 0, 2);
     scriptNode.onaudioprocess = (event) => {
@@ -200,7 +226,8 @@ export function useMusicPlayer() {
       ymSamplesOutRef.current += samples.length;
     };
 
-    scriptNode.connect(ctx.destination);
+    scriptNode.connect(analyser);
+    analyser.connect(ctx.destination);
     ymNodeRef.current = scriptNode;
 
     progressTimerRef.current = window.setInterval(() => {
@@ -243,7 +270,57 @@ export function useMusicPlayer() {
       }));
     }, 200);
 
-    setState((prev) => ({ ...prev, status: 'playing', duration: duration ?? 0 }));
+    setState((prev) => ({ ...prev, status: 'playing', duration: duration ?? 0, analyser }));
+  }, []);
+
+  const playWav = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
+    const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+    const objectUrl = URL.createObjectURL(blob);
+    audioObjectUrlRef.current = objectUrl;
+
+    const audio = new Audio(objectUrl);
+    audio.preload = 'auto';
+    audioElRef.current = audio;
+
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.22;
+    analyser.minDecibels = -92;
+    analyser.maxDecibels = -18;
+
+    const source = ctx.createMediaElementSource(audio);
+    mediaSourceRef.current = source;
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    audio.ontimeupdate = () => {
+      setState((prev) => ({
+        ...prev,
+        position: audio.currentTime,
+        duration: Number.isFinite(audio.duration) ? audio.duration : prev.duration,
+        status: audio.paused ? (endedRef.current ? 'idle' : 'paused') : 'playing',
+      }));
+    };
+    audio.onended = () => {
+      endedRef.current = true;
+      setState((prev) => ({
+        ...prev,
+        status: 'idle',
+        position: prev.duration,
+        trackerPlayback: null,
+      }));
+      onEndedRef.current?.();
+    };
+
+    await audio.play();
+    setState((prev) => ({
+      ...prev,
+      status: 'playing',
+      duration: Number.isFinite(audio.duration) ? audio.duration : 0,
+      trackerSong: null,
+      trackerPlayback: null,
+      analyser,
+    }));
   }, []);
 
   const playMod = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
@@ -252,8 +329,10 @@ export function useMusicPlayer() {
     await player.init();
 
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.35;
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.22;
+    analyser.minDecibels = -92;
+    analyser.maxDecibels = -18;
 
     if (player.processNode) {
       player.processNode.disconnect();
@@ -318,6 +397,8 @@ export function useMusicPlayer() {
         const response = await fetch(url);
         if (!response.ok) throw new Error('Could not load audio file');
         const arrayBuffer = await response.arrayBuffer();
+        const contentType = response.headers.get('content-type') ?? '';
+        const engine = response.headers.get('x-playback-engine') ?? '';
 
         const ctx = audioContextRef.current ?? new AudioContext();
         audioContextRef.current = ctx;
@@ -325,6 +406,11 @@ export function useMusicPlayer() {
 
         if (track.format.toUpperCase() === 'SNDH') {
           await playSndh(arrayBuffer, ctx);
+          return;
+        }
+
+        if (engine === 'uade' || contentType.includes('audio/wav') || contentType.includes('audio/wave')) {
+          await playWav(arrayBuffer, ctx);
           return;
         }
 
@@ -337,12 +423,17 @@ export function useMusicPlayer() {
         }));
       }
     },
-    [playMod, playSndh, stopAll],
+    [playMod, playSndh, playWav, stopAll],
   );
 
   const pause = useCallback(() => {
     if (trackerRef.current) {
       trackerRef.current.pause();
+      setState((prev) => ({ ...prev, status: 'paused' }));
+      return;
+    }
+    if (audioElRef.current) {
+      audioElRef.current.pause();
       setState((prev) => ({ ...prev, status: 'paused' }));
       return;
     }
@@ -357,6 +448,12 @@ export function useMusicPlayer() {
     if (trackerRef.current) {
       trackerRef.current.unpause();
       setState((prev) => ({ ...prev, status: 'playing' }));
+      return;
+    }
+    if (audioElRef.current) {
+      void audioElRef.current.play().then(() => {
+        setState((prev) => ({ ...prev, status: 'playing' }));
+      });
       return;
     }
     if (ymPlayerRef.current) {
@@ -381,6 +478,23 @@ export function useMusicPlayer() {
   }, [stopAll]);
 
   const seek = useCallback((seconds: number) => {
+    const audio = audioElRef.current;
+    if (audio) {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : null;
+      const next =
+        duration != null && duration > 0
+          ? Math.min(Math.max(0, seconds), duration)
+          : Math.max(0, seconds);
+      audio.currentTime = next;
+      endedRef.current = duration != null && next >= duration;
+      setState((prev) => ({
+        ...prev,
+        position: next,
+        status: audio.paused ? 'paused' : 'playing',
+      }));
+      return;
+    }
+
     const ym = ymPlayerRef.current;
     if (ym) {
       const duration = ymDurationRef.current;

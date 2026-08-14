@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadAmigaIndex } from './amiga.js';
+import { normalizeGameKey } from '../searchQuery.js';
 import type { Track } from '../types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,27 +21,10 @@ function amigaRoot(): string {
   return path.join(PROJECT_ROOT, 'data', 'amiga');
 }
 
-export function normalizeGameKey(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/['’`]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[_./\\]+/g, ' ')
-    .replace(/[^a-z0-9 ]+/g, ' ')
-    .replace(/\b(the|a|an)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function expandKeys(value: string): string[] {
   const keys = new Set<string>();
   const base = normalizeGameKey(value);
   if (base) keys.add(base);
-  const stripped = normalizeGameKey(
-    value.replace(/\b(cd32|cdtv|ecs|aga|remake|remix|soundtrack)\b/gi, ' '),
-  );
-  if (stripped) keys.add(stripped);
   return [...keys];
 }
 

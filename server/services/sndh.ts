@@ -2,7 +2,7 @@ import * as cheerio from 'cheerio';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { matchesAllTokens, searchTokens } from '../searchQuery.js';
+import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
 
@@ -236,18 +236,34 @@ function scoreRecord(record: SndhRecord, query: string, field: SearchField): num
   const tokens = searchTokens(query);
   if (tokens.length === 0) return 1;
 
-  const phrase = query.trim().toLowerCase();
-  const title = record.title.toLowerCase();
-  const artist = record.artist.toLowerCase();
-  const folderArtist = record.folderArtist.toLowerCase();
+  const phrase = normalizeGameKey(query);
+  const title = normalizeGameKey(record.title);
+  const artist = normalizeGameKey(record.artist);
+  const folderArtist = normalizeGameKey(record.folderArtist);
+  const game = normalizeGameKey(record.game ?? '');
   const haystack = recordHaystack(record, field);
+
+  if (field === 'game' || field === 'any') {
+    if (matchesNormalizedGame(query, record.game, record.title, record.notes)) {
+      if (game === phrase || title === phrase) return 100;
+      if (game.startsWith(phrase) || title.startsWith(phrase)) return 92;
+      return 88;
+    }
+  }
 
   if (!matchesAllTokens(haystack, tokens)) return 0;
 
-  if (title === phrase || artist === phrase || folderArtist === phrase) return 100;
-  if (title.startsWith(phrase) || artist.startsWith(phrase) || folderArtist.startsWith(phrase)) return 85;
-  if (title.includes(phrase) || artist.includes(phrase)) return 70;
-  if (tokens.every((token) => title.includes(token))) return 60;
+  if (title === phrase || artist === phrase || folderArtist === phrase || game === phrase) return 100;
+  if (
+    title.startsWith(phrase) ||
+    artist.startsWith(phrase) ||
+    folderArtist.startsWith(phrase) ||
+    game.startsWith(phrase)
+  ) {
+    return 85;
+  }
+  if (title.includes(phrase) || artist.includes(phrase) || game.includes(phrase)) return 70;
+  if (tokens.every((token) => title.includes(token) || game.includes(token))) return 60;
   return 40;
 }
 
