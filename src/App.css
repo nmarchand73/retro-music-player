@@ -842,10 +842,16 @@ select:focus-visible,
   border-radius: 999px;
   background: var(--accent-pale);
   color: var(--accent);
-  font-size: 0.95rem;
+  /* ▶ has heavy optical padding; size + nudge so the triangle fills the circle */
+  font-size: 1.35rem;
   line-height: 1;
   flex-shrink: 0;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.track-play:not(.playing) {
+  /* Optical center: play triangles sit left of the glyph box */
+  text-indent: 0.12em;
 }
 
 .track-play:hover {
@@ -855,6 +861,8 @@ select:focus-visible,
 .track-play.playing {
   background: var(--accent);
   color: #fff;
+  font-size: 1.05rem;
+  text-indent: 0;
   animation: playing-pulse 1.6s ease-in-out infinite;
 }
 
