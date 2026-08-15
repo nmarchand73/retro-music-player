@@ -2,8 +2,10 @@
 """
 Intent: native desktop shell for Retro Music Player (local window over Express).
 Architecture: owned Node server subprocess + pywebview (Cocoa); private_mode=False
-so player prefs persist; music dumps under ~/Library/Application Support (or repo
-data/ when developing); launch errors in Logs.
+and a fixed preferred port so origin-scoped localStorage stays stable; UI prefs also
+mirror to ~/Library/Application Support/Retro Music Player/prefs.json via /api/prefs.
+Music dumps under Application Support (or repo data/ when developing); launch errors
+in Logs.
 Quality: 8/10 — MyChat / Chess Insight pattern adapted for Node + Vite dist.
 """
 
@@ -93,18 +95,75 @@ def _wait_ready(host: str, port: int, timeout: float = 45.0) -> bool:
     return False
 
 
-def _pick_free_port(host: str, preferred: int) -> int:
+def _pids_listening_on_port(port: int) -> list[int]:
+    """Return PIDs listening on TCP port (macOS/Linux via lsof)."""
+    if not shutil.which("lsof"):
+        return []
+    try:
+        out = subprocess.check_output(
+            ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return []
+    pids: list[int] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if line.isdigit():
+            pids.append(int(line))
+    return pids
+
+
+def _wait_port_closed(host: str, port: int, timeout: float = 8.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _port_open(host, port):
+            return True
+        time.sleep(0.1)
+    return not _port_open(host, port)
+
+
+def _reclaim_preferred_port(host: str, preferred: int) -> None:
+    """
+    Keep a stable origin (http://127.0.0.1:PREFERRED). localStorage is origin-scoped,
+    so hopping to 3011+ after a rebuild looks like wiped settings.
+    """
     if not _port_open(host, preferred):
-        return preferred
+        return
+
     ours = _is_our_server(host, preferred)
-    _log(
-        f"[retro-music] Port {preferred} is busy"
-        f"{' (leftover server)' if ours else ''} — picking another port"
-    )
-    for candidate in range(preferred + 1, preferred + 40):
-        if not _port_open(host, candidate):
-            return candidate
-    raise RuntimeError(f"No free port near {preferred}")
+    pids = _pids_listening_on_port(preferred)
+    if ours or pids:
+        _log(
+            f"[retro-music] Reclaiming port {preferred}"
+            f"{' (leftover Retro Music Player)' if ours else ''}"
+            f" — stopping PID(s) {pids or '?'}"
+        )
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+        if not _wait_port_closed(host, preferred, timeout=4.0):
+            for pid in pids:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+            _wait_port_closed(host, preferred, timeout=3.0)
+
+    if _port_open(host, preferred):
+        raise RuntimeError(
+            f"Port {preferred} is still busy (needed for stable settings storage).\n"
+            f"Quit whatever is using it, or set RETRO_MUSIC_PORT to a free port "
+            f"and keep using that same port every launch."
+        )
+
+
+def _pick_free_port(host: str, preferred: int) -> int:
+    _reclaim_preferred_port(host, preferred)
+    return preferred
 
 
 def _has_archives(data_dir: Path) -> bool:

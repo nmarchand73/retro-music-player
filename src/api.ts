@@ -76,3 +76,25 @@ export async function hydrateTrackCovers(tracks: Track[]): Promise<Track[]> {
 export function absoluteStreamUrl(streamUrl: string): string {
   return streamUrl.startsWith('http') ? streamUrl : streamUrl;
 }
+
+export type ClientPrefsPayload = {
+  machines?: unknown;
+  audioFx?: unknown;
+  bookmarks?: unknown;
+};
+
+export async function fetchPrefs(): Promise<ClientPrefsPayload> {
+  const response = await fetch(`${API_BASE}/prefs`);
+  if (!response.ok) return {};
+  const data = (await response.json()) as unknown;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  return data as ClientPrefsPayload;
+}
+
+export async function putPrefs(patch: ClientPrefsPayload): Promise<void> {
+  await fetch(`${API_BASE}/prefs`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+}

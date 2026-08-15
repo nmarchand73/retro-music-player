@@ -1,21 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { hydrateTrackCovers } from '../api';
+import { hydrateClientPrefs, persistPrefsPatch } from '../lib/clientPrefs';
 import type { Track } from '../types';
 import { trackKey } from '../utils/trackKey';
 
 const STORAGE_KEY = 'retro-music-player.bookmarks';
-
-function loadBookmarks(): Track[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isTrack);
-  } catch {
-    return [];
-  }
-}
 
 function isTrack(value: unknown): value is Track {
   if (!value || typeof value !== 'object') return false;
@@ -29,8 +18,28 @@ function isTrack(value: unknown): value is Track {
   );
 }
 
-function persist(next: Track[]): void {
+function parseBookmarks(raw: unknown): Track[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter(isTrack);
+}
+
+function loadBookmarks(): Track[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return parseBookmarks(JSON.parse(raw) as unknown) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocal(next: Track[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
+
+function persist(next: Track[]): void {
+  writeLocal(next);
+  persistPrefsPatch({ bookmarks: next });
 }
 
 function coversChanged(before: Track[], after: Track[]): boolean {
@@ -45,14 +54,24 @@ export function useBookmarks() {
   const [bookmarks, setBookmarks] = useState<Track[]>(loadBookmarks);
 
   useEffect(() => {
-    const stored = loadBookmarks();
-    if (stored.length === 0) return;
     let cancelled = false;
-    void hydrateTrackCovers(stored)
-      .then((hydrated) => {
-        if (cancelled || !coversChanged(stored, hydrated)) return;
-        persist(hydrated);
-        setBookmarks(hydrated);
+    void hydrateClientPrefs()
+      .then((prefs) => {
+        if (cancelled) return;
+        const fromDisk = parseBookmarks(prefs.bookmarks);
+        const stored = fromDisk ?? loadBookmarks();
+        if (fromDisk) {
+          writeLocal(fromDisk);
+          setBookmarks(fromDisk);
+        } else if (stored.length > 0) {
+          persist(stored);
+        }
+        if (stored.length === 0) return;
+        return hydrateTrackCovers(stored).then((hydrated) => {
+          if (cancelled || !coversChanged(stored, hydrated)) return;
+          persist(hydrated);
+          setBookmarks(hydrated);
+        });
       })
       .catch(() => undefined);
     return () => {

@@ -49,6 +49,7 @@ import {
   sndhDownloadUrl,
   sndhReferer,
 } from './services/sndh.js';
+import { readPrefs, writePrefs } from './prefs.js';
 import type { DatabaseInfo, MusicPlatform, SearchField, SearchResponse, Track } from './types.js';
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -107,6 +108,35 @@ app.get('/api/health', async (_req, res) => {
     c64Local: c64,
     uade,
   });
+});
+
+/** Durable UI prefs (machines / FX / bookmarks) — survives port / webview origin changes. */
+app.get('/api/prefs', async (_req, res) => {
+  try {
+    res.json(await readPrefs());
+  } catch (err) {
+    console.error('[prefs] read failed', err);
+    res.status(500).json({ error: 'Failed to read prefs' });
+  }
+});
+
+app.put('/api/prefs', async (req, res) => {
+  try {
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      res.status(400).json({ error: 'Expected prefs object' });
+      return;
+    }
+    const patch = body as {
+      machines?: unknown;
+      audioFx?: unknown;
+      bookmarks?: unknown;
+    };
+    res.json(await writePrefs(patch));
+  } catch (err) {
+    console.error('[prefs] write failed', err);
+    res.status(500).json({ error: 'Failed to write prefs' });
+  }
 });
 
 app.get('/api/databases', async (_req, res) => {
