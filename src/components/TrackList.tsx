@@ -548,7 +548,9 @@ export function TrackList({
                       <TrackCover track={track} showPlaceholder={false} />
                     </span>
                   )
-                ) : null}
+                ) : (
+                  <span className="track-cover-slot" aria-hidden="true" />
+                )}
                 <SearchFacetButton
                   className="platform-badge"
                   label="platform"
