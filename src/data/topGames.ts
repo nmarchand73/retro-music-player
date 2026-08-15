@@ -1,6 +1,7 @@
 /** Top 100 game & music rankings across Amiga, Atari ST, CPC, and C64. */
 import gameRankings from './top100Rankings.json' with { type: 'json' };
 import musicRankings from './top100MusicRankings.json' with { type: 'json' };
+import gameHistories from './topGameHistories.json' with { type: 'json' };
 
 export type TopGamePlatform = 'amiga' | 'atari' | 'cpc' | 'c64';
 
@@ -41,6 +42,10 @@ export interface TopGame {
   platforms: TopGamePlatform[];
   /** 1-based ranks from ordered sources. */
   ranks: Partial<Record<RankSourceId, number>>;
+  /** Short encyclopedic history (≤200 words), when available. */
+  history?: string;
+  /** Wikipedia (or other) page for the history blurb. */
+  historyUrl?: string;
 }
 
 type GameJsonPlatformKey = keyof typeof gameRankings.platforms;
@@ -337,6 +342,55 @@ export const MUSIC_RANKINGS_META = {
   methodology: musicRankings.methodology,
 };
 
+type HistoryRecord = {
+  history?: string | null;
+  url?: string | null;
+};
+
+function historyForTitle(title: string): Pick<TopGame, 'history' | 'historyUrl'> {
+  const records = gameHistories as Record<string, HistoryRecord>;
+  const candidates = [title, stripEditionSuffix(title)];
+  for (const key of candidates) {
+    const hit = records[key];
+    if (hit?.history) {
+      return { history: hit.history, historyUrl: hit.url ?? undefined };
+    }
+  }
+  return {};
+}
+
+/** Resolve a short history blurb for a playing track's game name. */
+export function lookupGameHistory(
+  game: string | undefined | null,
+): { title: string; history: string } | null {
+  if (!game?.trim()) return null;
+  const needle = game.trim();
+  const direct = historyForTitle(needle);
+  if (direct.history) {
+    return { title: stripEditionSuffix(needle), history: direct.history };
+  }
+
+  const records = gameHistories as Record<string, HistoryRecord>;
+  const q = rankingSearchQuery(needle).toLowerCase();
+  const needleLower = needle.toLowerCase();
+
+  let best: { title: string; history: string; score: number } | null = null;
+  for (const [title, rec] of Object.entries(records)) {
+    if (!rec.history) continue;
+    const titleQ = rankingSearchQuery(title).toLowerCase();
+    const titleLower = title.toLowerCase();
+    let score = 0;
+    if (titleQ === q || titleLower === needleLower) score = 3;
+    else if (titleQ === needleLower || titleLower === q) score = 2;
+    else if (titleLower.startsWith(needleLower) || needleLower.startsWith(titleLower)) score = 1;
+    else continue;
+    if (!best || score > best.score) {
+      best = { title, history: rec.history, score };
+    }
+  }
+  return best ? { title: best.title, history: best.history } : null;
+}
+
 function buildFromGameRankings(): TopGame[] {
   const byKey = new Map<string, TopGame>();
 
@@ -351,6 +405,7 @@ function buildFromGameRankings(): TopGame[] {
         searchQuery,
         platforms: [platform],
         ranks: { [rankKey]: entry.rank },
+        ...historyForTitle(entry.title),
       });
     }
   }
@@ -372,6 +427,7 @@ function buildFromMusicRankings(): TopGame[] {
         searchQuery,
         platforms: [platform],
         ranks: { [rankKey]: entry.rank },
+        ...historyForTitle(entry.game),
       });
     }
   }

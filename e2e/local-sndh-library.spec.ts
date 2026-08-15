@@ -35,6 +35,9 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('tab', { name: 'Best music' })).toHaveAttribute('aria-selected', 'true');
 
     await expect(page.getByText(/Best Classic Computer Game Music/i).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Show history for Wizball' }).click();
+    await expect(page.getByText(/Sensible Software/i).first()).toBeVisible();
+    await page.getByRole('button', { name: 'Hide history for Wizball' }).click();
     await page.getByRole('button', { name: 'Search game Wizball from C64 music Top 100' }).click();
     await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Wizball');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');

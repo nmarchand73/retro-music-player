@@ -1,9 +1,10 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { BookmarkButton } from './BookmarkButton';
 import { MarqueeText } from './MarqueeText';
 import { MiniSpectrum } from './MiniSpectrum';
 import { Spectrum3D } from './Spectrum3D';
 import { TrackCover } from './TrackCover';
+import { lookupGameHistory } from '../data/topGames';
 import type { ChipChannelMutes, PlayerStatus } from '../hooks/useMusicPlayer';
 import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
 import type { Track } from '../types';
@@ -267,6 +268,7 @@ export function PlayerBar({
   const titleDuration =
     duration > 0 ? formatClock(duration) : status !== 'loading' && track ? formatDuration(duration) : null;
   const playing = status === 'playing';
+  const demo = useMemo(() => lookupGameHistory(track?.game), [track?.game]);
 
   const commitSeek = (seconds: number) => {
     draggingRef.current = false;
@@ -425,7 +427,13 @@ export function PlayerBar({
         </aside>
 
         <div className="player-stage-viz">
-          <Spectrum3D analyser={analyser} playing={playing} variant="panel" />
+          <Spectrum3D
+            analyser={analyser}
+            playing={playing}
+            variant="panel"
+            demoTitle={demo?.title ?? null}
+            demoText={demo?.history ?? null}
+          />
         </div>
       </div>
 

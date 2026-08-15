@@ -98,6 +98,7 @@ function gamesForPlatform(entries: TopGame[], column: PlatformColumn, needle: st
 function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void }) {
   const [filter, setFilter] = useState('');
   const [kind, setKind] = useState<RankingKind>('music');
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const needle = filter.trim().toLowerCase();
   const columnsDef = platformColumnsFor(kind);
   const entries = topEntriesFor(kind);
@@ -113,8 +114,8 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
 
   const headerBlurb =
     kind === 'music'
-      ? `${MUSIC_RANKINGS_META.title} — click a title to search all platforms`
-      : `Official Top 100 games per machine — click a title to search all platforms${
+      ? `${MUSIC_RANKINGS_META.title} — click a title to search; open History for a short background`
+      : `Official Top 100 games per machine — click a title to search; open History for a short background${
           RANKINGS_META.generatedAt ? ` · lists from ${RANKINGS_META.generatedAt}` : ''
         }`;
 
@@ -186,28 +187,60 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                 const searchDiffers =
                   game.searchQuery.toLowerCase() !== game.title.toLowerCase();
                 const listLabel = kind === 'music' ? 'music Top 100' : 'Top 100';
+                const rowKey = `${kind}-${column.id}-${displayRank}-${game.title}`;
+                const expanded = expandedKey === rowKey;
+                const hasHistory = Boolean(game.history);
                 return (
-                  <li key={`${kind}-${column.id}-${displayRank}-${game.title}`}>
-                    <button
-                      type="button"
-                      className="top-game-row"
-                      aria-label={`Search game ${game.title} from ${column.short} ${listLabel}`}
-                      title={
-                        searchDiffers
-                          ? `${game.title} → search “${game.searchQuery}”`
-                          : game.title
-                      }
-                      onClick={() =>
-                        onSearch({
-                          query: game.searchQuery,
-                          field: 'game',
-                          platform: 'all',
-                        })
-                      }
-                    >
-                      <span className="top-game-rank">{String(displayRank).padStart(3, '0')}</span>
-                      <span className="top-game-title">{game.title}</span>
-                    </button>
+                  <li key={rowKey} className={expanded ? 'is-expanded' : undefined}>
+                    <div className="top-game-row-wrap">
+                      <button
+                        type="button"
+                        className="top-game-row"
+                        aria-label={`Search game ${game.title} from ${column.short} ${listLabel}`}
+                        title={
+                          searchDiffers
+                            ? `${game.title} → search “${game.searchQuery}”`
+                            : game.title
+                        }
+                        onClick={() =>
+                          onSearch({
+                            query: game.searchQuery,
+                            field: 'game',
+                            platform: 'all',
+                          })
+                        }
+                      >
+                        <span className="top-game-rank">{String(displayRank).padStart(3, '0')}</span>
+                        <span className="top-game-title">{game.title}</span>
+                      </button>
+                      {hasHistory ? (
+                        <button
+                          type="button"
+                          className={`top-game-history-toggle${expanded ? ' is-open' : ''}`}
+                          aria-expanded={expanded}
+                          aria-controls={`history-${rowKey}`}
+                          aria-label={`${expanded ? 'Hide' : 'Show'} history for ${game.title}`}
+                          onClick={() => setExpandedKey(expanded ? null : rowKey)}
+                        >
+                          History
+                        </button>
+                      ) : null}
+                    </div>
+                    {expanded && game.history ? (
+                      <div className="top-game-history" id={`history-${rowKey}`}>
+                        <p>{game.history}</p>
+                        {game.historyUrl ? (
+                          <a
+                            className="top-game-history-source"
+                            href={game.historyUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Source
+                          </a>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}

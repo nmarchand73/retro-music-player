@@ -14,6 +14,8 @@ dist-ssr
 *.local
 scripts/.venv/
 desktop-venv/
+scripts/_chart-titles.json
+scripts/_history-batches/
 
 # Local music dumps
 data/sndh/

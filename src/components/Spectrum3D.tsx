@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { AmigaDemoScroll } from './AmigaDemoScroll';
 import { MiniSpectrum } from './MiniSpectrum';
 
 const BAR_COUNT = 40;
@@ -23,6 +24,9 @@ interface Spectrum3DProps {
   analyser: AnalyserNode | null;
   playing: boolean;
   variant?: 'panel' | 'backdrop';
+  /** Optional Amiga-demo scrolltext (e.g. game history). */
+  demoTitle?: string | null;
+  demoText?: string | null;
 }
 
 const levelsScratch = new Float32Array(BAR_COUNT);
@@ -265,7 +269,13 @@ function disposeObject(root: THREE.Object3D) {
   for (const geometry of geometries) geometry.dispose();
 }
 
-export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DProps) {
+export function Spectrum3D({
+  analyser,
+  playing,
+  variant = 'panel',
+  demoTitle = null,
+  demoText = null,
+}: Spectrum3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const analyserRef = useRef(analyser);
   const playingRef = useRef(playing);
@@ -639,17 +649,27 @@ export function Spectrum3D({ analyser, playing, variant = 'panel' }: Spectrum3DP
 
   if (fallback) {
     return (
-      <div className={`spectrum-3d-fallback${isBackdrop ? ' is-backdrop' : ''}`}>
-        <MiniSpectrum analyser={analyser} playing={playing} variant="stage" />
+      <div className={`spectrum-3d-shell${isBackdrop ? ' is-backdrop' : ''}`}>
+        <div className={`spectrum-3d-fallback${isBackdrop ? ' is-backdrop' : ''}`}>
+          <MiniSpectrum analyser={analyser} playing={playing} variant="stage" />
+        </div>
+        {demoText && demoTitle ? (
+          <AmigaDemoScroll title={demoTitle} text={demoText} playing={playing} />
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div
-      ref={hostRef}
-      className={`spectrum-3d${isBackdrop ? ' is-backdrop' : ''}`}
-      aria-hidden="true"
-    />
+    <div className={`spectrum-3d-shell${isBackdrop ? ' is-backdrop' : ''}`}>
+      <div
+        ref={hostRef}
+        className={`spectrum-3d${isBackdrop ? ' is-backdrop' : ''}`}
+        aria-hidden="true"
+      />
+      {demoText && demoTitle ? (
+        <AmigaDemoScroll title={demoTitle} text={demoText} playing={playing} />
+      ) : null}
+    </div>
   );
 }
