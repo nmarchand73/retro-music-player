@@ -54,8 +54,8 @@ test.describe('Local SNDH library golden path', () => {
 
     await page.getByRole('tab', { name: 'BEST', exact: true }).click();
     await page.getByRole('tab', { name: 'Best games' }).click();
-    await page.getByRole('button', { name: 'Search game The Chaos Engine from Amiga Top 100', exact: true }).click();
-    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('The Chaos Engine');
+    await page.getByRole('button', { name: 'Search game Chaos Engine from Amiga 101 Jeux', exact: true }).click();
+    await expect(page.getByRole('searchbox', { name: 'Search music' })).toHaveValue('Chaos Engine');
     await expect(page.getByRole('combobox', { name: 'Platform' })).toHaveValue('all');
     await expect(
       page

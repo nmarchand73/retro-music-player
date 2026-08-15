@@ -115,7 +115,7 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
   const headerBlurb =
     kind === 'music'
       ? `${MUSIC_RANKINGS_META.title} — click a title to search; open History for a short background`
-      : `Official Top 100 games per machine — click a title to search; open History for a short background${
+      : `Official game lists per machine (Amiga: 101 Jeux Amiga) — click a title to search; open History for a short background${
           RANKINGS_META.generatedAt ? ` · lists from ${RANKINGS_META.generatedAt}` : ''
         }`;
 
@@ -186,7 +186,12 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                 const displayRank = rank != null ? rank : index + 1;
                 const searchDiffers =
                   game.searchQuery.toLowerCase() !== game.title.toLowerCase();
-                const listLabel = kind === 'music' ? 'music Top 100' : 'Top 100';
+                const listLabel =
+                  kind === 'music'
+                    ? 'music Top 100'
+                    : column.id === 'amiga'
+                      ? '101 Jeux'
+                      : 'Top 100';
                 const rowKey = `${kind}-${column.id}-${displayRank}-${game.title}`;
                 const expanded = expandedKey === rowKey;
                 const hasHistory = Boolean(game.history);
@@ -195,7 +200,7 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                     <div className="top-game-row-wrap">
                       <button
                         type="button"
-                        className="top-game-row"
+                        className={`top-game-row${game.coverUrl ? ' has-cover' : ''}`}
                         aria-label={`Search game ${game.title} from ${column.short} ${listLabel}`}
                         title={
                           searchDiffers
@@ -211,6 +216,17 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                         }
                       >
                         <span className="top-game-rank">{String(displayRank).padStart(3, '0')}</span>
+                        {game.coverUrl ? (
+                          <img
+                            className="top-game-cover"
+                            src={game.coverUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            width={48}
+                            height={30}
+                          />
+                        ) : null}
                         <span className="top-game-title">{game.title}</span>
                       </button>
                       {hasHistory ? (

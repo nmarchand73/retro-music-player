@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-08-14",
-  "description": "Top 100 games for Commodore 64, Amstrad CPC, Commodore Amiga and Atari ST, with a documented source for each platform.",
+  "description": "Top game lists for Commodore 64, Amstrad CPC, Commodore Amiga and Atari ST, with a documented source for each platform. Amiga uses the curated 101 Jeux Amiga book list.",
   "platforms": {
     "C64": {
       "platform": "Commodore 64",
@@ -827,411 +827,415 @@
     "AMIGA": {
       "platform": "Commodore Amiga",
       "source": {
-        "name": "Lemon Amiga",
-        "url": "https://www.lemonamiga.com/games/votes_list.php",
-        "method": "community user ratings",
-        "note": "Current Top 100 ranking; separate releases/versions can appear independently. Tail entries were normalized where the parsed live view did not expose every final row."
+        "name": "101 Jeux Amiga",
+        "url": "https://101jeuxamiga.fr/liste.html",
+        "method": "curated book list (David Taddei)",
+        "note": "The 101 Amiga 500 (1MB) games featured in the French book 101 Jeux Amiga, in book order. Official list and cover scans: 101jeuxamiga.fr."
       },
       "games": [
         {
           "rank": 1,
-          "title": "The Secret of Monkey Island"
+          "title": "Advantage Tennis"
         },
         {
           "rank": 2,
-          "title": "Turrican II: The Final Fight (2022)"
+          "title": "The Adventures of Robin Hood"
         },
         {
           "rank": 3,
-          "title": "Monkey Island 2: LeChuck's Revenge"
+          "title": "Agony"
         },
         {
           "rank": 4,
-          "title": "Sensible World of Soccer '96/'97"
-        },
-        {
-          "rank": 5,
-          "title": "The Settlers"
-        },
-        {
-          "rank": 6,
-          "title": "Turrican II: The Final Fight"
-        },
-        {
-          "rank": 7,
-          "title": "Dune II: The Battle for Arrakis"
-        },
-        {
-          "rank": 8,
-          "title": "Lemmings"
-        },
-        {
-          "rank": 9,
-          "title": "Civilization"
-        },
-        {
-          "rank": 10,
-          "title": "Slam Tilt"
-        },
-        {
-          "rank": 11,
-          "title": "Formula One Grand Prix"
-        },
-        {
-          "rank": 12,
-          "title": "UFO: Enemy Unknown"
-        },
-        {
-          "rank": 13,
-          "title": "Sensible World of Soccer '95/'96"
-        },
-        {
-          "rank": 14,
-          "title": "Sensible World of Soccer"
-        },
-        {
-          "rank": 15,
-          "title": "Ambermoon"
-        },
-        {
-          "rank": 16,
-          "title": "Cannon Fodder"
-        },
-        {
-          "rank": 17,
-          "title": "Wings"
-        },
-        {
-          "rank": 18,
-          "title": "Indiana Jones and the Fate of Atlantis"
-        },
-        {
-          "rank": 19,
-          "title": "Speedball 2: Brutal Deluxe"
-        },
-        {
-          "rank": 20,
-          "title": "UFO: Enemy Unknown (AGA)"
-        },
-        {
-          "rank": 21,
-          "title": "Another World"
-        },
-        {
-          "rank": 22,
-          "title": "Flashback"
-        },
-        {
-          "rank": 23,
-          "title": "Pirates!"
-        },
-        {
-          "rank": 24,
-          "title": "Syndicate"
-        },
-        {
-          "rank": 25,
-          "title": "Pinball Fantasies"
-        },
-        {
-          "rank": 26,
-          "title": "Worms: The Director's Cut"
-        },
-        {
-          "rank": 27,
-          "title": "Pinball Dreams"
-        },
-        {
-          "rank": 28,
-          "title": "Simon the Sorcerer"
-        },
-        {
-          "rank": 29,
-          "title": "Cannon Fodder (AGA)"
-        },
-        {
-          "rank": 30,
-          "title": "Moonstone: A Hard Days Knight"
-        },
-        {
-          "rank": 31,
-          "title": "UFO: Enemy Unknown (OCS/ECS)"
-        },
-        {
-          "rank": 32,
-          "title": "Lotus Turbo Challenge 2"
-        },
-        {
-          "rank": 33,
-          "title": "Eye of the Beholder II: The Legend of Darkmoon"
-        },
-        {
-          "rank": 34,
-          "title": "Pinball Fantasies (AGA)"
-        },
-        {
-          "rank": 35,
-          "title": "Colonization"
-        },
-        {
-          "rank": 36,
-          "title": "Simon the Sorcerer (AGA)"
-        },
-        {
-          "rank": 37,
-          "title": "Tiny Bobble"
-        },
-        {
-          "rank": 38,
-          "title": "Civilization (AGA)"
-        },
-        {
-          "rank": 39,
-          "title": "It Came from the Desert"
-        },
-        {
-          "rank": 40,
-          "title": "Pinball Fantasies (CD32)"
-        },
-        {
-          "rank": 41,
-          "title": "Worms"
-        },
-        {
-          "rank": 42,
-          "title": "The Chaos Engine"
-        },
-        {
-          "rank": 43,
-          "title": "Battle Squadron: The Destruction of the Barrax Empire"
-        },
-        {
-          "rank": 44,
-          "title": "Worms (AGA)"
-        },
-        {
-          "rank": 45,
-          "title": "Dungeon Master"
-        },
-        {
-          "rank": 46,
-          "title": "World Circuit"
-        },
-        {
-          "rank": 47,
-          "title": "Lemmings 2: The Tribes"
-        },
-        {
-          "rank": 48,
-          "title": "Out of this World"
-        },
-        {
-          "rank": 49,
-          "title": "Indiana Jones and the Last Crusade"
-        },
-        {
-          "rank": 50,
-          "title": "Dyna Blaster"
-        },
-        {
-          "rank": 51,
-          "title": "IK+"
-        },
-        {
-          "rank": 52,
-          "title": "Mega lo Mania"
-        },
-        {
-          "rank": 53,
-          "title": "Stunt Car Racer"
-        },
-        {
-          "rank": 54,
-          "title": "North & South"
-        },
-        {
-          "rank": 55,
-          "title": "Rodland"
-        },
-        {
-          "rank": 56,
-          "title": "Maniac Mansion"
-        },
-        {
-          "rank": 57,
-          "title": "Sensible World of Soccer v1.1"
-        },
-        {
-          "rank": 58,
-          "title": "Banshee"
-        },
-        {
-          "rank": 59,
-          "title": "Beneath a Steel Sky"
-        },
-        {
-          "rank": 60,
-          "title": "The Chaos Engine (AGA)"
-        },
-        {
-          "rank": 61,
-          "title": "Dune"
-        },
-        {
-          "rank": 62,
-          "title": "Eye of the Beholder"
-        },
-        {
-          "rank": 63,
-          "title": "F-19 Stealth Fighter"
-        },
-        {
-          "rank": 64,
-          "title": "Turrican"
-        },
-        {
-          "rank": 65,
-          "title": "Beneath a Steel Sky (CD32)"
-        },
-        {
-          "rank": 66,
-          "title": "Frontier: Elite II"
-        },
-        {
-          "rank": 67,
-          "title": "Bubble Bobble"
-        },
-        {
-          "rank": 68,
-          "title": "Lotus Esprit Turbo Challenge"
-        },
-        {
-          "rank": 69,
-          "title": "Pinball Illusions"
-        },
-        {
-          "rank": 70,
-          "title": "Populous II: Trials of the Olympian Gods"
-        },
-        {
-          "rank": 71,
-          "title": "Super Cars II"
-        },
-        {
-          "rank": 72,
-          "title": "Die Siedler"
-        },
-        {
-          "rank": 73,
-          "title": "Superfrog"
-        },
-        {
-          "rank": 74,
-          "title": "Zak McKracken and the Alien Mindbenders"
-        },
-        {
-          "rank": 75,
-          "title": "Gunship 2000"
-        },
-        {
-          "rank": 76,
-          "title": "Lionheart"
-        },
-        {
-          "rank": 77,
-          "title": "NightHawk F-117A Stealth Fighter 2.0"
-        },
-        {
-          "rank": 78,
-          "title": "Railroad Tycoon"
-        },
-        {
-          "rank": 79,
-          "title": "Deluxe Galaga"
-        },
-        {
-          "rank": 80,
-          "title": "Alien Breed: Tower Assault"
-        },
-        {
-          "rank": 81,
-          "title": "Championship Manager '93"
-        },
-        {
-          "rank": 82,
-          "title": "Fightin' Spirit"
-        },
-        {
-          "rank": 83,
-          "title": "Genetic Species"
-        },
-        {
-          "rank": 84,
-          "title": "Laser Squad"
-        },
-        {
-          "rank": 85,
-          "title": "Lords of the Rising Sun"
-        },
-        {
-          "rank": 86,
-          "title": "Millennium 2.2"
-        },
-        {
-          "rank": 87,
-          "title": "Reunion"
-        },
-        {
-          "rank": 88,
-          "title": "Utopia: The Creation of a Nation"
-        },
-        {
-          "rank": 89,
-          "title": "Historyline 1914-1918"
-        },
-        {
-          "rank": 90,
-          "title": "Hybris"
-        },
-        {
-          "rank": 91,
-          "title": "The Misadventures of Flink"
-        },
-        {
-          "rank": 92,
-          "title": "Oh No! More Lemmings"
-        },
-        {
-          "rank": 93,
-          "title": "Worthy"
-        },
-        {
-          "rank": 94,
-          "title": "Ishar 2: Messengers of Doom"
-        },
-        {
-          "rank": 95,
-          "title": "Apidya"
-        },
-        {
-          "rank": 96,
-          "title": "Project-X"
-        },
-        {
-          "rank": 97,
           "title": "Alien Breed"
         },
         {
-          "rank": 98,
+          "rank": 5,
+          "title": "Another World"
+        },
+        {
+          "rank": 6,
+          "title": "Apidya"
+        },
+        {
+          "rank": 7,
+          "title": "Barbarian 2"
+        },
+        {
+          "rank": 8,
+          "title": "B.A.T."
+        },
+        {
+          "rank": 9,
+          "title": "Batman the Movie"
+        },
+        {
+          "rank": 10,
+          "title": "Battle Isle"
+        },
+        {
+          "rank": 11,
+          "title": "Battle Squadron"
+        },
+        {
+          "rank": 12,
+          "title": "Benefactor"
+        },
+        {
+          "rank": 13,
+          "title": "Black Crypt"
+        },
+        {
+          "rank": 14,
+          "title": "Cadaver"
+        },
+        {
+          "rank": 15,
+          "title": "Cannon Fodder"
+        },
+        {
+          "rank": 16,
+          "title": "Captain Blood"
+        },
+        {
+          "rank": 17,
+          "title": "Captive"
+        },
+        {
+          "rank": 18,
+          "title": "Castle Master"
+        },
+        {
+          "rank": 19,
+          "title": "Chaos Engine"
+        },
+        {
+          "rank": 20,
+          "title": "Croisière pour un Cadavre"
+        },
+        {
+          "rank": 21,
+          "title": "Darkmere : The Nightmare's Begun"
+        },
+        {
+          "rank": 22,
+          "title": "Dark Seed"
+        },
+        {
+          "rank": 23,
+          "title": "Defender of the Crown"
+        },
+        {
+          "rank": 24,
+          "title": "Deliverance"
+        },
+        {
+          "rank": 25,
+          "title": "Desert Strike"
+        },
+        {
+          "rank": 26,
+          "title": "Disposable Hero"
+        },
+        {
+          "rank": 27,
+          "title": "Drakkhen"
+        },
+        {
+          "rank": 28,
+          "title": "Dreamweb"
+        },
+        {
+          "rank": 29,
+          "title": "Dune"
+        },
+        {
+          "rank": 30,
+          "title": "Dune II: The Battle for Arrakis"
+        },
+        {
+          "rank": 31,
+          "title": "Elfmania"
+        },
+        {
+          "rank": 32,
+          "title": "Epic"
+        },
+        {
+          "rank": 33,
+          "title": "Exile"
+        },
+        {
+          "rank": 34,
+          "title": "Extase"
+        },
+        {
+          "rank": 35,
+          "title": "F/A-18 Interceptor"
+        },
+        {
+          "rank": 36,
+          "title": "Faery Tale Adventure, The"
+        },
+        {
+          "rank": 37,
+          "title": "Fire and Ice"
+        },
+        {
+          "rank": 38,
+          "title": "First Samurai"
+        },
+        {
+          "rank": 39,
+          "title": "Flashback: The Quest for Identity"
+        },
+        {
+          "rank": 40,
+          "title": "Flood"
+        },
+        {
+          "rank": 41,
+          "title": "Formula One Grand Prix"
+        },
+        {
+          "rank": 42,
+          "title": "Frontier: Elite II"
+        },
+        {
+          "rank": 43,
+          "title": "The Godfather"
+        },
+        {
+          "rank": 44,
           "title": "Gods"
         },
         {
-          "rank": 99,
+          "rank": 45,
+          "title": "Golden Axe"
+        },
+        {
+          "rank": 46,
+          "title": "Great Courts 2"
+        },
+        {
+          "rank": 47,
+          "title": "Heimdall"
+        },
+        {
+          "rank": 48,
+          "title": "Hunter"
+        },
+        {
+          "rank": 49,
+          "title": "Indiana Jones and the Last Crusade, Aventure"
+        },
+        {
+          "rank": 50,
+          "title": "It came from the Desert"
+        },
+        {
+          "rank": 51,
+          "title": "James Pond 2: Codename RoboCod"
+        },
+        {
+          "rank": 52,
+          "title": "Jim Power in Mutant Planet"
+        },
+        {
+          "rank": 53,
+          "title": "Kick Off 2"
+        },
+        {
+          "rank": 54,
+          "title": "Leander"
+        },
+        {
+          "rank": 55,
+          "title": "Lemmings"
+        },
+        {
+          "rank": 56,
+          "title": "Lionheart"
+        },
+        {
+          "rank": 57,
+          "title": "Lotus Esprit Turbo Challenge"
+        },
+        {
+          "rank": 58,
+          "title": "Magic Pockets"
+        },
+        {
+          "rank": 59,
+          "title": "Marble Madness"
+        },
+        {
+          "rank": 60,
+          "title": "Maupiti Island"
+        },
+        {
+          "rank": 61,
+          "title": "Mega lo Mania"
+        },
+        {
+          "rank": 62,
+          "title": "Moonstone: A Hard Days Knight"
+        },
+        {
+          "rank": 63,
+          "title": "No Second Prize"
+        },
+        {
+          "rank": 64,
+          "title": "North & South"
+        },
+        {
+          "rank": 65,
+          "title": "Operation Stealth"
+        },
+        {
+          "rank": 66,
+          "title": "Pang"
+        },
+        {
+          "rank": 67,
+          "title": "Pinball Dreams"
+        },
+        {
+          "rank": 68,
+          "title": "Pirates!"
+        },
+        {
+          "rank": 69,
+          "title": "Populous"
+        },
+        {
+          "rank": 70,
+          "title": "Powermonger"
+        },
+        {
+          "rank": 71,
+          "title": "Prince of Persia"
+        },
+        {
+          "rank": 72,
+          "title": "Project-X"
+        },
+        {
+          "rank": 73,
+          "title": "Putty"
+        },
+        {
+          "rank": 74,
+          "title": "Rainbow Islands"
+        },
+        {
+          "rank": 75,
+          "title": "Rick Dangerous"
+        },
+        {
+          "rank": 76,
+          "title": "Robocop 3"
+        },
+        {
+          "rank": 77,
+          "title": "Rodland"
+        },
+        {
+          "rank": 78,
+          "title": "Ruff 'n' Tumble"
+        },
+        {
+          "rank": 79,
+          "title": "The Secret of Monkey Island"
+        },
+        {
+          "rank": 80,
+          "title": "Sensible World of Soccer"
+        },
+        {
+          "rank": 81,
+          "title": "The Settlers"
+        },
+        {
+          "rank": 82,
+          "title": "Shadow of the Beast"
+        },
+        {
+          "rank": 83,
+          "title": "SimCity"
+        },
+        {
+          "rank": 84,
+          "title": "Soccer Kid"
+        },
+        {
+          "rank": 85,
+          "title": "Speedball 2: Brutal Deluxe"
+        },
+        {
+          "rank": 86,
+          "title": "Starglider 2"
+        },
+        {
+          "rank": 87,
+          "title": "Stunt Car Racer"
+        },
+        {
+          "rank": 88,
+          "title": "Super Cars II"
+        },
+        {
+          "rank": 89,
+          "title": "Superfrog"
+        },
+        {
+          "rank": 90,
           "title": "SWIV"
         },
         {
+          "rank": 91,
+          "title": "Syndicate"
+        },
+        {
+          "rank": 92,
+          "title": "Teenage Queen"
+        },
+        {
+          "rank": 93,
+          "title": "Toki"
+        },
+        {
+          "rank": 94,
+          "title": "Turrican 2"
+        },
+        {
+          "rank": 95,
+          "title": "Universe"
+        },
+        {
+          "rank": 96,
+          "title": "Unreal"
+        },
+        {
+          "rank": 97,
+          "title": "Les Voyageurs du Temps"
+        },
+        {
+          "rank": 98,
+          "title": "Vroom"
+        },
+        {
+          "rank": 99,
+          "title": "Wings"
+        },
+        {
           "rank": 100,
-          "title": "Kick Off 2"
+          "title": "Wizkid: The Story Of Wizball II"
+        },
+        {
+          "rank": 101,
+          "title": "Xenon II : Megablast"
         }
       ]
     },

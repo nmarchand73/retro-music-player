@@ -1,4 +1,4 @@
-/** Top 100 game & music rankings across Amiga, Atari ST, CPC, and C64. */
+/** Top game & music rankings across Amiga, Atari ST, CPC, and C64. */
 import gameRankings from './top100Rankings.json' with { type: 'json' };
 import musicRankings from './top100MusicRankings.json' with { type: 'json' };
 import gameHistories from './topGameHistories.json' with { type: 'json' };
@@ -42,6 +42,8 @@ export interface TopGame {
   platforms: TopGamePlatform[];
   /** 1-based ranks from ordered sources. */
   ranks: Partial<Record<RankSourceId, number>>;
+  /** Optional cover art URL (public path or absolute). */
+  coverUrl?: string;
   /** Short encyclopedic history (≤200 words), when available. */
   history?: string;
   /** Wikipedia (or other) page for the history blurb. */
@@ -118,6 +120,33 @@ const SEARCH_ALIASES: Record<string, string> = {
   'Ultima VI - The False Prophet': 'Ultima VI',
   'Last Ninja 2: Back with a Vengeance': 'Last Ninja 2',
   'The Last Ninja': 'Last Ninja',
+  'Barbarian II: The Dungeon of Drax': 'Barbarian 2',
+  'Barbarian 2': 'Barbarian 2',
+  'B.A.T.': 'B.A.T.',
+  'Batman the Movie': 'Batman The Movie',
+  'Batman: The Movie': 'Batman The Movie',
+  'Croisière pour un Cadavre': 'Cruise for a Corpse',
+  'Cruise for a Corpse': 'Cruise for a Corpse',
+  "Darkmere : The Nightmare's Begun": 'Darkmere',
+  'Darkmere: The Nightmare’s Begun': 'Darkmere',
+  'Faery Tale Adventure, The': 'Faery Tale Adventure',
+  'The Faery Tale Adventure': 'Faery Tale Adventure',
+  'Flashback: The Quest for Identity': 'Flashback',
+  'Indiana Jones and the Last Crusade, Aventure': 'Indiana Jones and the Last Crusade',
+  'Les Voyageurs du Temps': 'Les Voyageurs du Temps',
+  'SimCity': 'Sim City',
+  'Wizkid: The Story Of Wizball II': 'Wizkid',
+  'Xenon II : Megablast': 'Xenon 2',
+  'Xenon II: Megablast': 'Xenon 2',
+  'Chaos Engine': 'Chaos Engine',
+  'The Chaos Engine': 'Chaos Engine',
+  'James Pond 2: Codename RoboCod': 'James Pond 2',
+  'It came from the Desert': 'It Came from the Desert',
+  'Moonstone: A Hard Days Knight': 'Moonstone',
+  "Ruff 'n' Tumble": "Ruff 'n' Tumble",
+  'Turrican 2': 'Turrican 2',
+  'Frontier: Elite II': 'Frontier Elite 2',
+  'F/A-18 Interceptor': 'FA-18 Interceptor',
   'Last Ninja 2': 'Last Ninja 2',
   'Last Ninja 3': 'Last Ninja 3',
   'Archon: The Light and the Dark': 'Archon',
@@ -165,7 +194,6 @@ const SEARCH_ALIASES: Record<string, string> = {
   "Burnin' Rubber": 'Burnin Rubber',
   'Crazy Cars III': 'Crazy Cars 3',
   'Dizzy: The Ultimate Cartoon Adventure': 'Dizzy',
-  'Moonstone: A Hard Days Knight': 'Moonstone',
   'Out of this World': 'Another World',
   'Battle Squadron: The Destruction of the Barrax Empire': 'Battle Squadron',
   "Worms: The Director's Cut": 'Worms',
@@ -178,7 +206,6 @@ const SEARCH_ALIASES: Record<string, string> = {
   'The Misadventures of Flink': 'Flink',
   'Oh No! More Lemmings': 'Oh No More Lemmings',
   'Die Siedler': 'The Settlers',
-  'Frontier: Elite II': 'Frontier',
   'Frontier - Elite II': 'Frontier',
   "Hard Drivin' II - Drive Harder": 'Hard Drivin 2',
   'IK+ (International Karate +)': 'IK+',
@@ -202,7 +229,6 @@ const SEARCH_ALIASES: Record<string, string> = {
   'Rambo III': 'Rambo 3',
   'Myth: History in the Making': 'Myth',
   "Jeroen Tel's Eliminator": 'Eliminator',
-  'Batman: The Movie': 'Batman the Movie',
   'Batman: The Caped Crusader': 'Batman Caped Crusader',
   "Bitmap Brothers' Magic Pockets": 'Magic Pockets',
   'Jim Power in Mutant Planet': 'Jim Power',
@@ -347,15 +373,57 @@ type HistoryRecord = {
   url?: string | null;
 };
 
+function historyKeyCandidates(title: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (value: string | undefined) => {
+    const v = value?.trim();
+    if (!v || seen.has(v)) return;
+    seen.add(v);
+    out.push(v);
+  };
+
+  push(title);
+  push(stripEditionSuffix(title));
+  push(rankingSearchQuery(title));
+
+  // Drop subtitle after colon / en-dash for keys like "Darkmere : The Nightmare's Begun".
+  const base = title.split(/\s*[:–—]\s*/)[0]?.trim();
+  if (base && base !== title) {
+    push(base);
+    push(rankingSearchQuery(base));
+  }
+
+  // "Title, The" → "The Title"
+  const commaThe = title.match(/^(.+),\s+The$/i);
+  if (commaThe?.[1]) {
+    push(`The ${commaThe[1].trim()}`);
+    push(commaThe[1].trim());
+  }
+
+  return out;
+}
+
 function historyForTitle(title: string): Pick<TopGame, 'history' | 'historyUrl'> {
   const records = gameHistories as Record<string, HistoryRecord>;
-  const candidates = [title, stripEditionSuffix(title)];
-  for (const key of candidates) {
+  for (const key of historyKeyCandidates(title)) {
     const hit = records[key];
     if (hit?.history) {
       return { history: hit.history, historyUrl: hit.url ?? undefined };
     }
   }
+
+  const needles = new Set(
+    historyKeyCandidates(title).map((k) => rankingSearchQuery(k).toLowerCase()),
+  );
+  for (const [key, rec] of Object.entries(records)) {
+    if (!rec?.history) continue;
+    const keyQ = rankingSearchQuery(key).toLowerCase();
+    if (needles.has(keyQ) || needles.has(key.toLowerCase())) {
+      return { history: rec.history, historyUrl: rec.url ?? undefined };
+    }
+  }
+
   return {};
 }
 
@@ -391,6 +459,10 @@ export function lookupGameHistory(
   return best ? { title: best.title, history: best.history } : null;
 }
 
+function amiga101CoverUrl(rank: number): string {
+  return `/covers/amiga101/${String(rank).padStart(3, '0')}.jpg`;
+}
+
 function buildFromGameRankings(): TopGame[] {
   const byKey = new Map<string, TopGame>();
 
@@ -405,6 +477,7 @@ function buildFromGameRankings(): TopGame[] {
         searchQuery,
         platforms: [platform],
         ranks: { [rankKey]: entry.rank },
+        ...(platform === 'amiga' ? { coverUrl: amiga101CoverUrl(entry.rank) } : {}),
         ...historyForTitle(entry.title),
       });
     }
