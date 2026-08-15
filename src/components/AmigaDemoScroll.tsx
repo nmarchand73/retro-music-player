@@ -210,9 +210,9 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
-      // Drop shadow (whole badge)
-      ctx.fillStyle = 'rgba(12, 4, 28, 0.65)';
-      ctx.fillText(badge, width / 2 + 2, titleY + 3);
+      // Soft drop shadow (whole badge)
+      ctx.fillStyle = 'rgba(12, 4, 28, 0.28)';
+      ctx.fillText(badge, width / 2 + 2, titleY + 2);
 
       // Copper-wave per letter
       const letters = [...badge];
@@ -228,8 +228,8 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
         grad.addColorStop(0.4, '#ffc078');
         grad.addColorStop(0.7, '#e2185a');
         grad.addColorStop(1, '#7b4ec4');
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = 'rgba(20, 8, 40, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(20, 8, 40, 0.45)';
         ctx.strokeText(ch, lx + chW / 2, gy);
         ctx.fillStyle = grad;
         ctx.fillText(ch, lx + chW / 2, gy);
@@ -269,7 +269,7 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
             }
             if (cx > width + 28) break;
 
-            const phase = cx * 0.55 + t * 55;
+            const phase = cx * 0.35 + t * 10;
             const sine = reduceMotion ? 0 : sampleSin(sinY, phase) * waveAmp;
             const stretch = reduceMotion ? 1 : 1 + sampleSin(sinStretch, phase * 1.3) * 0.35;
             const y = opts.mirror
@@ -282,23 +282,26 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
             ctx.scale(1, opts.mirror ? -stretch * 0.85 : stretch);
 
             if (opts.shadow) {
-              ctx.fillStyle = 'rgba(10, 4, 24, 0.55)';
-              ctx.fillText(ch, 2, 3);
+              ctx.fillStyle = 'rgba(10, 4, 24, 0.22)';
+              ctx.fillText(ch, 1.5, 2);
             }
 
-            const color = LETTER_COPPER[Math.floor((phase + i * 3) % LETTER_COPPER.length)]!;
+            // Slow copper cycle — readable letter colors, gentle drift over time.
+            const color = LETTER_COPPER[
+              Math.floor((cx * 0.04 + t * 1.6 + i * 0.35) % LETTER_COPPER.length)
+            ]!;
             const grad = ctx.createLinearGradient(0, -fontPx * 0.55, 0, fontPx * 0.55);
             if (opts.mirror) {
-              grad.addColorStop(0, 'rgba(80, 50, 140, 0.15)');
+              grad.addColorStop(0, 'rgba(80, 50, 140, 0.12)');
               grad.addColorStop(0.5, color);
-              grad.addColorStop(1, 'rgba(255, 180, 120, 0.35)');
+              grad.addColorStop(1, 'rgba(255, 180, 120, 0.25)');
             } else {
               grad.addColorStop(0, '#fff8ee');
               grad.addColorStop(0.35, color);
               grad.addColorStop(1, '#3d2f8a');
             }
-            ctx.lineWidth = 2.2;
-            ctx.strokeStyle = opts.mirror ? 'rgba(20, 10, 40, 0.35)' : 'rgba(16, 6, 32, 0.92)';
+            ctx.lineWidth = 1.8;
+            ctx.strokeStyle = opts.mirror ? 'rgba(20, 10, 40, 0.22)' : 'rgba(16, 6, 32, 0.4)';
             ctx.textAlign = 'center';
             ctx.strokeText(ch, 0, 0);
             ctx.fillStyle = grad;
