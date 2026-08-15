@@ -44,7 +44,7 @@ export interface TopGame {
   ranks: Partial<Record<RankSourceId, number>>;
   /** Optional cover art URL (public path or absolute). */
   coverUrl?: string;
-  /** Short encyclopedic history (≤200 words), when available. */
+  /** Short punchy history (≤200 characters), when available. */
   history?: string;
   /** Wikipedia (or other) page for the history blurb. */
   historyUrl?: string;
@@ -404,12 +404,21 @@ function historyKeyCandidates(title: string): string[] {
   return out;
 }
 
+function clipHistory(text: string, maxChars = 200): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  const cut = trimmed.slice(0, maxChars - 1);
+  const atSpace = cut.lastIndexOf(' ');
+  const base = (atSpace > maxChars * 0.6 ? cut.slice(0, atSpace) : cut).replace(/[,:;–—-]\s*$/, '');
+  return `${base}…`;
+}
+
 function historyForTitle(title: string): Pick<TopGame, 'history' | 'historyUrl'> {
   const records = gameHistories as Record<string, HistoryRecord>;
   for (const key of historyKeyCandidates(title)) {
     const hit = records[key];
     if (hit?.history) {
-      return { history: hit.history, historyUrl: hit.url ?? undefined };
+      return { history: clipHistory(hit.history), historyUrl: hit.url ?? undefined };
     }
   }
 
@@ -420,7 +429,7 @@ function historyForTitle(title: string): Pick<TopGame, 'history' | 'historyUrl'>
     if (!rec?.history) continue;
     const keyQ = rankingSearchQuery(key).toLowerCase();
     if (needles.has(keyQ) || needles.has(key.toLowerCase())) {
-      return { history: rec.history, historyUrl: rec.url ?? undefined };
+      return { history: clipHistory(rec.history), historyUrl: rec.url ?? undefined };
     }
   }
 
@@ -453,7 +462,7 @@ export function lookupGameHistory(
     else if (titleLower.startsWith(needleLower) || needleLower.startsWith(titleLower)) score = 1;
     else continue;
     if (!best || score > best.score) {
-      best = { title, history: rec.history, score };
+      best = { title, history: clipHistory(rec.history), score };
     }
   }
   return best ? { title: best.title, history: best.history } : null;
