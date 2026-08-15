@@ -60,7 +60,8 @@ export function searchTokens(query: string): string[] {
 export function matchesAllTokens(haystack: string, tokens: string[]): boolean {
   if (tokens.length === 0) return true;
   const text = normalizeSearchText(haystack);
-  return tokens.every((token) => text.includes(token));
+  const compact = text.replace(/ /g, '');
+  return tokens.every((token) => text.includes(token) || compact.includes(token));
 }
 
 /** True when every query token appears in the candidate game/title key. */
@@ -70,6 +71,7 @@ export function matchesNormalizedGame(query: string, ...candidates: Array<string
   return candidates.some((candidate) => {
     if (!candidate) return false;
     const key = normalizeGameKey(candidate);
-    return tokens.every((token) => key.includes(token));
+    const compact = key.replace(/ /g, '');
+    return tokens.every((token) => key.includes(token) || compact.includes(token));
   });
 }

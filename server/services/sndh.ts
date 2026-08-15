@@ -234,23 +234,44 @@ function scoreRecord(record: SndhRecord, query: string, field: SearchField): num
   if (tokens.length === 0) return 1;
 
   const phrase = normalizeGameKey(query);
+  const phraseCompact = phrase.replace(/ /g, '');
   const title = normalizeGameKey(record.title);
   const artist = normalizeGameKey(record.artist);
   const folderArtist = normalizeGameKey(record.folderArtist);
   const game = normalizeGameKey(record.game ?? '');
+  const titleCompact = title.replace(/ /g, '');
+  const gameCompact = game.replace(/ /g, '');
   const haystack = recordHaystack(record, field);
 
   if (field === 'game' || field === 'any') {
     if (matchesNormalizedGame(query, record.game, record.title, record.notes)) {
-      if (game === phrase || title === phrase) return 100;
-      if (game.startsWith(phrase) || title.startsWith(phrase)) return 92;
+      if (game === phrase || title === phrase || gameCompact === phraseCompact || titleCompact === phraseCompact) {
+        return 100;
+      }
+      if (
+        game.startsWith(phrase) ||
+        title.startsWith(phrase) ||
+        gameCompact.startsWith(phraseCompact) ||
+        titleCompact.startsWith(phraseCompact)
+      ) {
+        return 92;
+      }
       return 88;
     }
   }
 
   if (!matchesAllTokens(haystack, tokens)) return 0;
 
-  if (title === phrase || artist === phrase || folderArtist === phrase || game === phrase) return 100;
+  if (
+    title === phrase ||
+    artist === phrase ||
+    folderArtist === phrase ||
+    game === phrase ||
+    titleCompact === phraseCompact ||
+    gameCompact === phraseCompact
+  ) {
+    return 100;
+  }
   if (
     title.startsWith(phrase) ||
     artist.startsWith(phrase) ||
@@ -260,7 +281,17 @@ function scoreRecord(record: SndhRecord, query: string, field: SearchField): num
     return 85;
   }
   if (title.includes(phrase) || artist.includes(phrase) || game.includes(phrase)) return 70;
-  if (tokens.every((token) => title.includes(token) || game.includes(token))) return 60;
+  if (
+    tokens.every(
+      (token) =>
+        title.includes(token) ||
+        game.includes(token) ||
+        titleCompact.includes(token) ||
+        gameCompact.includes(token),
+    )
+  ) {
+    return 60;
+  }
   return 40;
 }
 

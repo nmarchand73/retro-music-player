@@ -148,6 +148,8 @@ const MODULE_PREFIX = new Set([
   'pha',
   'cust',
   'dw',
+  'rh',
+  'rho',
   'tiny',
   'osp',
   'alp',
@@ -551,25 +553,45 @@ function scoreRecord(record: AmigaRecord, query: string, field: SearchField): nu
   if (tokens.length === 0) return 1;
 
   const phrase = normalizeGameKey(query);
+  const phraseCompact = phrase.replace(/ /g, '');
   const title = normalizeGameKey(record.title);
   const artist = normalizeGameKey(record.artist);
   const game = normalizeGameKey(record.game ?? '');
+  const titleCompact = title.replace(/ /g, '');
+  const gameCompact = game.replace(/ /g, '');
   const haystack = recordHaystack(record, field);
 
   if (field === 'game' || field === 'any') {
     if (matchesNormalizedGame(query, record.game)) {
-      if (game === phrase) return 100;
-      if (game.startsWith(phrase) || phrase.startsWith(game)) return 92;
+      if (game === phrase || gameCompact === phraseCompact) return 100;
+      if (
+        game.startsWith(phrase) ||
+        phrase.startsWith(game) ||
+        gameCompact.startsWith(phraseCompact) ||
+        phraseCompact.startsWith(gameCompact)
+      ) {
+        return 92;
+      }
       return 88;
     }
   }
 
   if (!matchesAllTokens(haystack, tokens)) return 0;
 
-  if (title === phrase || artist === phrase || game === phrase) return 100;
+  if (
+    title === phrase ||
+    artist === phrase ||
+    game === phrase ||
+    titleCompact === phraseCompact ||
+    gameCompact === phraseCompact
+  ) {
+    return 100;
+  }
   if (title.startsWith(phrase) || artist.startsWith(phrase) || game.startsWith(phrase)) return 85;
   if (title.includes(phrase) || artist.includes(phrase) || game.includes(phrase)) return 70;
-  if (tokens.every((token) => title.includes(token) || game.includes(token))) return 60;
+  if (tokens.every((token) => title.includes(token) || game.includes(token) || titleCompact.includes(token) || gameCompact.includes(token))) {
+    return 60;
+  }
   return 40;
 }
 
