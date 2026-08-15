@@ -541,6 +541,10 @@ select:focus-visible,
   overflow: auto;
   min-height: 0;
   flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  justify-content: flex-start;
 }
 
 .top-game-row {
@@ -670,11 +674,19 @@ select:focus-visible,
   padding: 0;
   display: grid;
   gap: 0;
+  /* Don't stretch sparse rows to fill the panel (bookmarks with 1–2 items). */
+  align-content: start;
+  grid-auto-rows: max-content;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   min-height: 0;
   flex: 1 1 0;
+}
+
+.track-list > li {
+  min-height: 0;
+  height: max-content;
 }
 
 .track-row {
@@ -2742,6 +2754,8 @@ select:focus-visible,
   padding: 0;
   display: grid;
   gap: 0.2rem;
+  align-content: start;
+  grid-auto-rows: max-content;
   max-height: min(42vh, 28rem);
   overflow: auto;
 }
@@ -2919,6 +2933,8 @@ select:focus-visible,
   padding: 0;
   display: grid;
   gap: 0.65rem;
+  align-content: start;
+  grid-auto-rows: max-content;
 }
 
 .settings-machine-row {
@@ -3042,6 +3058,8 @@ select:focus-visible,
   padding: 0;
   display: grid;
   gap: 0.4rem;
+  align-content: start;
+  grid-auto-rows: max-content;
 }
 
 .settings-fx-preview-row {

@@ -28,10 +28,29 @@ function makeSinTable(amplitude: number): Float32Array {
   return table;
 }
 
+function isBounceLetter(ch: string): boolean {
+  return ch.trim().length > 0 && ch !== '★';
+}
+
+/** Jump length 1–20, biased toward short hops with occasional long leaps. */
+function nextJumpLength(): number {
+  const roll = Math.random();
+  if (roll < 0.55) return 1 + Math.floor(Math.random() * 3); // 1–3
+  if (roll < 0.82) return 4 + Math.floor(Math.random() * 5); // 4–8
+  if (roll < 0.94) return 9 + Math.floor(Math.random() * 6); // 9–14
+  return 15 + Math.floor(Math.random() * 6); // 15–20
+}
+
+function hopSpan(fromLand: number, toLand: number, landCount: number): number {
+  const span = Math.abs(toLand - fromLand);
+  return Math.min(span, landCount - span);
+}
+
 /**
  * Amiga cracktro-inspired overlay:
  * - Parallax starfield
  * - Sine scrolltext with water mirror reflection
+ * - White bounce-ball hopping letter-to-letter
  */
 export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -78,6 +97,30 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
     let charWidths: Float32Array | null = null;
     let textW = 1;
 
+    /** Indices of glyphs the ball may land on (skip spaces / stars). */
+    const landable: number[] = [];
+    for (let i = 0; i < scroll.length; i += 1) {
+      if (isBounceLetter(scroll[i]!)) landable.push(i);
+    }
+
+    type BallState = {
+      fromLand: number;
+      toLand: number;
+      progress: number;
+      dwell: number;
+      squash: number;
+      /** +1 / -1 along the scroll — flips at screen edges like a living critter. */
+      dir: 1 | -1;
+    };
+    const ball: BallState = {
+      fromLand: 0,
+      toLand: Math.min(2, Math.max(0, landable.length - 1)),
+      progress: 1,
+      dwell: 0.35,
+      squash: 0,
+      dir: 1,
+    };
+
     const resize = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
@@ -120,6 +163,99 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       const i1 = (i0 + 1) % 256;
       const f = idx - i0;
       return table[i0]! * (1 - f) + table[i1]! * f;
+    };
+
+    const scrollMetrics = (t: number) => {
+      const speed = playing && !reduceMotion ? 64 : 24;
+      const scrollX = reduceMotion ? width * 0.05 : -((t * speed) % textW);
+      const baseY = height * 0.86;
+      const waveAmp = 0.55;
+      return { scrollX, baseY, waveAmp };
+    };
+
+    /** World position of scroll glyph `charIndex` (nearest of the two tiled copies). */
+    const letterWorldPos = (
+      charIndex: number,
+      t: number,
+      fontPx: number,
+      preferX?: number,
+    ): { x: number; y: number } | null => {
+      if (!charWidths || charIndex < 0 || charIndex >= scroll.length) return null;
+      const { scrollX, baseY, waveAmp } = scrollMetrics(t);
+      let offset = 0;
+      for (let i = 0; i < charIndex; i += 1) offset += charWidths[i]!;
+      const chW = charWidths[charIndex]!;
+      const anchor = preferX ?? width * 0.55;
+
+      let best: { x: number; y: number } | null = null;
+      let bestScore = Number.POSITIVE_INFINITY;
+      for (let copy = 0; copy < 2; copy += 1) {
+        const cx = scrollX + copy * textW + offset;
+        const midX = cx + chW / 2;
+        const phase = cx * 0.35 + t * 10;
+        const sine = reduceMotion ? 0 : sampleSin(sinY, phase) * waveAmp;
+        const y = baseY + sine - fontPx * 0.55;
+        const score = Math.abs(midX - anchor);
+        if (score < bestScore) {
+          bestScore = score;
+          best = { x: midX, y };
+        }
+      }
+      return best;
+    };
+
+    const landScreenX = (landIndex: number, t: number, preferX?: number): number | null => {
+      const charIndex = landable[landIndex];
+      if (charIndex == null) return null;
+      // fontPx only offsets Y; X is independent — pass a dummy for the lookup helper.
+      const pos = letterWorldPos(charIndex, t, 12, preferX);
+      return pos?.x ?? null;
+    };
+
+    const pickNextLand = (fromLand: number, t: number, preferX: number): number => {
+      if (landable.length < 2) return fromLand;
+
+      const leftEdge = width * 0.1;
+      const rightEdge = width * 0.9;
+      const hereX = landScreenX(fromLand, t, preferX);
+
+      // Turn around when drifting off-screen — keep the ball in the living stage.
+      if (hereX != null) {
+        if (hereX < leftEdge) ball.dir = 1;
+        else if (hereX > rightEdge) ball.dir = -1;
+        // Occasional curious flip while comfortably on stage.
+        else if (Math.random() < 0.1) ball.dir = ball.dir === 1 ? -1 : 1;
+      }
+
+      const tryCandidate = (dir: 1 | -1, jump: number): number | null => {
+        const next = fromLand + dir * jump;
+        if (next < 0 || next >= landable.length) return null;
+        const x = landScreenX(next, t, preferX);
+        if (x == null) return next;
+        // Reject landings that are already off the far edge in this travel direction.
+        if (dir === 1 && x > width + 40) return null;
+        if (dir === -1 && x < -40) return null;
+        return next;
+      };
+
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const jump = nextJumpLength();
+        const primary = tryCandidate(ball.dir, jump);
+        if (primary != null) return primary;
+
+        const otherDir: 1 | -1 = ball.dir === 1 ? -1 : 1;
+        const flipped = tryCandidate(otherDir, jump);
+        if (flipped != null) {
+          ball.dir = otherDir;
+          return flipped;
+        }
+      }
+
+      // Last resort: step one glyph toward the current facing, or reverse at the ends.
+      const step = fromLand + ball.dir;
+      if (step >= 0 && step < landable.length) return step;
+      ball.dir = ball.dir === 1 ? -1 : 1;
+      return Math.max(0, Math.min(landable.length - 1, fromLand + ball.dir));
     };
 
     const drawStars = (t: number) => {
@@ -175,12 +311,8 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
 
-      const speed = playing && !reduceMotion ? 64 : 24;
-      const scrollX = reduceMotion ? width * 0.05 : -((t * speed) % textW);
-      // Keep the wavy scroll in the lower foreground band.
-      const baseY = height * 0.86;
+      const { scrollX, baseY, waveAmp } = scrollMetrics(t);
       const mirrorY = height * 0.96;
-      const waveAmp = 0.55;
 
       const drawPass = (opts: {
         yScale: number;
@@ -254,10 +386,111 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       drawPass({ yScale: 1, alpha: 1, mirror: false });
     };
 
+    const drawBounceBall = (t: number, dt: number, fontPx: number) => {
+      if (landable.length === 0 || reduceMotion) return;
+
+      const rate = playing ? 1 : 0.55;
+      if (ball.progress >= 1) {
+        ball.dwell -= dt * rate;
+        ball.squash = Math.max(0, ball.squash - dt * 4);
+        if (ball.dwell <= 0) {
+          ball.fromLand = ball.toLand;
+          const settle = letterWorldPos(landable[ball.fromLand]!, t, fontPx);
+          // If scroll carried us off-stage mid-dwell, turn around immediately.
+          if (settle) {
+            if (settle.x < width * 0.08) ball.dir = 1;
+            else if (settle.x > width * 0.92) ball.dir = -1;
+          }
+          ball.toLand = pickNextLand(ball.fromLand, t, settle?.x ?? width * 0.5);
+          ball.progress = 0;
+          ball.dwell = 0;
+        }
+      } else {
+        // Longer leaps take a touch more airtime.
+        const span = hopSpan(ball.fromLand, ball.toLand, landable.length) || 1;
+        const duration = 0.28 + Math.min(span, 20) * 0.018;
+        ball.progress = Math.min(1, ball.progress + (dt * rate) / duration);
+        if (ball.progress >= 1) {
+          ball.progress = 1;
+          ball.dwell = 0.08 + Math.random() * 0.16;
+          ball.squash = 1;
+        }
+      }
+
+      const fromIdx = landable[ball.fromLand]!;
+      const toIdx = landable[ball.toLand]!;
+      const from = letterWorldPos(fromIdx, t, fontPx);
+      if (!from) return;
+      const to = letterWorldPos(toIdx, t, fontPx, from.x) ?? from;
+
+      // Mid-air: if the hop is clearly fleeing the stage, abort and rebound next dwell.
+      if (ball.progress < 1) {
+        const midX = from.x + (to.x - from.x) * ball.progress;
+        if (midX < -30 && ball.dir === -1) ball.dir = 1;
+        if (midX > width + 30 && ball.dir === 1) ball.dir = -1;
+      }
+
+      const p = ball.progress >= 1 ? 1 : ball.progress;
+      // Smoothstep horizontal, parabolic lift for that classic demo bounce.
+      const ease = p * p * (3 - 2 * p);
+      const hop = Math.sin(Math.PI * p);
+      const lift =
+        fontPx * (1.15 + Math.min(hopSpan(ball.fromLand, ball.toLand, landable.length), 20) * 0.04);
+      const x = from.x + (to.x - from.x) * ease;
+      const y = from.y + (to.y - from.y) * ease - hop * lift;
+
+      const radius = Math.max(4.5, fontPx * 0.38);
+      const squash = ball.squash * (ball.progress >= 1 ? 1 : Math.max(0, 1 - p * 8));
+      const rx = radius * (1 + squash * 0.35);
+      const ry = radius * (1 - squash * 0.45);
+
+      // Soft contact shadow on the letter tops.
+      ctx.save();
+      ctx.globalAlpha = 0.28 + hop * 0.15;
+      ctx.fillStyle = 'rgba(10, 4, 24, 0.55)';
+      const shadowY = from.y + (to.y - from.y) * ease + radius * 0.15;
+      ctx.beginPath();
+      ctx.ellipse(x, shadowY, rx * (0.85 + hop * 0.35), ry * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Glossy white sphere
+      ctx.save();
+      const body = ctx.createRadialGradient(
+        x - rx * 0.35,
+        y - ry * 0.4,
+        rx * 0.08,
+        x,
+        y,
+        rx * 1.15,
+      );
+      body.addColorStop(0, '#ffffff');
+      body.addColorStop(0.45, '#f4f0ff');
+      body.addColorStop(0.82, '#d8d0ea');
+      body.addColorStop(1, '#a89bc4');
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.beginPath();
+      ctx.ellipse(x - rx * 0.28, y - ry * 0.32, rx * 0.28, ry * 0.2, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    };
+
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
       const minDelta = playing && !reduceMotion ? 1000 / 40 : 1000 / 16;
       if (last && now - last < minDelta) return;
+      const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
       last = now;
       const t = now * 0.001;
 
@@ -282,6 +515,7 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       const fontPx = measureScroll();
       drawTitle(t, fontPx);
       drawScroll(t, fontPx);
+      drawBounceBall(t, dt, fontPx);
     };
 
     raf = requestAnimationFrame(draw);
