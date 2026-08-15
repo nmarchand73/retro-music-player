@@ -6,29 +6,6 @@ interface AmigaDemoScrollProps {
   playing: boolean;
 }
 
-/** Classic Amiga copper ramp: dark → highlight → dark (scanline metal look). */
-function copperRamp(base: [number, number, number], rows: number): string[] {
-  const out: string[] = [];
-  for (let i = 0; i < rows; i += 1) {
-    const t = i / Math.max(1, rows - 1);
-    // Peak brightness near the middle of the bar (classic raster bar).
-    const peak = 1 - Math.abs(t * 2 - 1);
-    const glow = 0.22 + peak * 0.95;
-    const r = Math.min(255, Math.round(base[0] * glow + peak * 40));
-    const g = Math.min(255, Math.round(base[1] * glow + peak * 28));
-    const b = Math.min(255, Math.round(base[2] * glow + peak * 55));
-    out.push(`rgb(${r},${g},${b})`);
-  }
-  return out;
-}
-
-const BAR_PALETTES = [
-  copperRamp([80, 40, 200], 14),
-  copperRamp([220, 30, 110], 14),
-  copperRamp([255, 140, 40], 14),
-  copperRamp([120, 70, 220], 14),
-];
-
 const LETTER_COPPER = [
   '#6b4cff',
   '#c44ecf',
@@ -53,10 +30,8 @@ function makeSinTable(amplitude: number): Float32Array {
 
 /**
  * Amiga cracktro-inspired overlay:
- * - Moving copper bars with highlight ramps (Copper-style raster bars)
  * - Parallax starfield
- * - Sine scrolltext with drop-shadow + water mirror reflection
- * Research: stashofcode sine-scroll series, vikke copperbars, Mark Wrobel wave scroll.
+ * - Sine scrolltext with water mirror reflection
  */
 export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -92,13 +67,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       layer: 0.28,
     }));
     const stars = [...farStars, ...midStars, ...nearStars];
-
-    // Virtual copper bars orbiting with sin/cos (vikke.net style depth illusion).
-    const bars = BAR_PALETTES.map((palette, i) => ({
-      palette,
-      phase: (i / BAR_PALETTES.length) * Math.PI * 2,
-      speed: 0.55 + i * 0.17,
-    }));
 
     let raf = 0;
     let last = 0;
@@ -154,40 +122,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       return table[i0]! * (1 - f) + table[i1]! * f;
     };
 
-    const drawCopperBars = (t: number) => {
-      // Keep bars in top + bottom bands only so the spectrum mid stays clear.
-      const rowH = Math.max(1, Math.floor(height * 0.01));
-      const zones: { base: number; travel: number; alphaMul: number }[] = [
-        { base: height * 0.02, travel: height * 0.16, alphaMul: 0.7 },
-        { base: height * 0.82, travel: height * 0.14, alphaMul: 0.55 },
-      ];
-
-      for (const zone of zones) {
-        const ordered = bars
-          .map((bar, i) => {
-            const ang = t * bar.speed + bar.phase + i;
-            const y = zone.base + ((Math.sin(ang) + 1) * 0.5) * zone.travel;
-            const depth = Math.cos(ang);
-            return { bar, y, depth };
-          })
-          .sort((a, b) => a.depth - b.depth);
-
-        for (const { bar, y, depth } of ordered) {
-          const near = (depth + 1) * 0.5;
-          const alpha = (0.12 + near * 0.22) * zone.alphaMul;
-          const scale = 0.8 + near * 0.25;
-          const rows = bar.palette.length;
-          for (let r = 0; r < rows; r += 1) {
-            ctx.globalAlpha = alpha * (0.5 + (r / rows) * 0.5);
-            ctx.fillStyle = bar.palette[r]!;
-            const yy = y + (r - rows / 2) * rowH * scale;
-            ctx.fillRect(0, yy, width, Math.max(1, rowH * scale));
-          }
-        }
-      }
-      ctx.globalAlpha = 1;
-    };
-
     const drawStars = (t: number) => {
       const drift = playing ? 1 : 0.35;
       for (const star of stars) {
@@ -209,10 +143,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       ctx.font = `800 ${Math.max(12, Math.floor(fontPx * 1.15))}px "Bebas Neue", Impact, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-
-      // Soft drop shadow (whole badge)
-      ctx.fillStyle = 'rgba(12, 4, 28, 0.28)';
-      ctx.fillText(badge, width / 2 + 2, titleY + 2);
 
       // Copper-wave per letter
       const letters = [...badge];
@@ -255,7 +185,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       const drawPass = (opts: {
         yScale: number;
         alpha: number;
-        shadow: boolean;
         mirror: boolean;
       }) => {
         for (let copy = 0; copy < 2; copy += 1) {
@@ -280,11 +209,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
             ctx.globalAlpha = opts.alpha;
             ctx.translate(cx + chW / 2, y);
             ctx.scale(1, opts.mirror ? -stretch * 0.85 : stretch);
-
-            if (opts.shadow) {
-              ctx.fillStyle = 'rgba(10, 4, 24, 0.22)';
-              ctx.fillText(ch, 1.5, 2);
-            }
 
             // Slow copper cycle — readable letter colors, gentle drift over time.
             const color = LETTER_COPPER[
@@ -318,8 +242,8 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
         }
       };
 
-      // Mirror first (behind), then shadow+glyphs
-      drawPass({ yScale: 0.55, alpha: 0.22, shadow: false, mirror: true });
+      // Mirror first (behind), then glyphs
+      drawPass({ yScale: 0.55, alpha: 0.22, mirror: true });
       const water = ctx.createLinearGradient(0, height * 0.88, 0, height);
       water.addColorStop(0, 'rgba(40, 20, 80, 0)');
       water.addColorStop(0.5, 'rgba(60, 30, 110, 0.12)');
@@ -327,7 +251,7 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       ctx.fillStyle = water;
       ctx.fillRect(0, height * 0.88, width, height * 0.12);
 
-      drawPass({ yScale: 1, alpha: 1, shadow: true, mirror: false });
+      drawPass({ yScale: 1, alpha: 1, mirror: false });
     };
 
     const draw = (now: number) => {
@@ -353,16 +277,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       botVeil.addColorStop(1, 'rgba(14, 8, 28, 0.42)');
       ctx.fillStyle = botVeil;
       ctx.fillRect(0, height * 0.72, width, height * 0.28);
-
-      if (!reduceMotion) drawCopperBars(t);
-      else {
-        for (let i = 0; i < 5; i += 1) {
-          ctx.fillStyle = BAR_PALETTES[0]![i + 3] ?? '#7b4ec4';
-          ctx.globalAlpha = 0.35;
-          ctx.fillRect(0, 4 + i * 3, width, 2);
-        }
-        ctx.globalAlpha = 1;
-      }
 
       drawStars(t);
       const fontPx = measureScroll();
