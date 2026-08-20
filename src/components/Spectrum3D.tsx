@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { AmigaDemoScroll } from './AmigaDemoScroll';
+import { createGreenBarFloorTexture, type GreenBarFloorHandle } from './GreenBarListing';
 import { MiniSpectrum } from './MiniSpectrum';
 
 const BAR_COUNT = 40;
@@ -279,11 +280,17 @@ export function Spectrum3D({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const analyserRef = useRef(analyser);
   const playingRef = useRef(playing);
+  const demoTitleRef = useRef(demoTitle);
+  const demoTextRef = useRef(demoText);
   const [fallback, setFallback] = useState(false);
   const isBackdrop = variant === 'backdrop';
+  /** History scroll + bounce-ball overlay (all platforms). */
+  const showAmigaDemo = Boolean(demoText && demoTitle);
 
   analyserRef.current = analyser;
   playingRef.current = playing;
+  demoTitleRef.current = demoTitle;
+  demoTextRef.current = demoText;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -294,7 +301,9 @@ export function Spectrum3D({
     let renderer: THREE.WebGLRenderer | undefined;
     let mirror: Reflector | undefined;
     let backdropTexture: THREE.CanvasTexture | undefined;
+    let listingFloor: GreenBarFloorHandle | undefined;
     let lastFrameMs = 0;
+    let lastTickMs = 0;
 
     const fail = (reason: unknown) => {
       console.error('[Spectrum3D]', reason);
@@ -356,25 +365,26 @@ export function Spectrum3D({
         clipBias: 0.003,
         textureWidth: REFLECTOR_WIDTH,
         textureHeight: REFLECTOR_HEIGHT,
-        color: 0xfff5ee,
+        color: 0xe8f2e4,
         multisample: 0,
       });
       mirror.rotation.x = -Math.PI / 2;
       mirror.position.y = 0;
       scene.add(mirror);
 
-      const sheen = new THREE.Mesh(
-        new THREE.PlaneGeometry(18, 10),
-        new THREE.MeshBasicMaterial({
-          color: 0xfff8f2,
-          transparent: true,
-          opacity: 0.28,
-          depthWrite: false,
-        }),
-      );
-      sheen.rotation.x = -Math.PI / 2;
-      sheen.position.y = 0.004;
-      scene.add(sheen);
+      listingFloor = createGreenBarFloorTexture(1024, 512);
+      const listingMat = new THREE.MeshBasicMaterial({
+        map: listingFloor.texture,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        toneMapped: false,
+      });
+      const listingPlane = new THREE.Mesh(new THREE.PlaneGeometry(18, 10), listingMat);
+      listingPlane.rotation.x = -Math.PI / 2;
+      listingPlane.position.y = 0.006;
+      listingPlane.renderOrder = 1;
+      scene.add(listingPlane);
 
       const spacing = BAR_SPACING;
       const radius = BAR_RADIUS;
@@ -412,9 +422,9 @@ export function Spectrum3D({
       const mirrorMat = createSpectrumBarMaterial({
         roughness: 1,
         metalness: 0,
-        emissiveIntensity: 0.15,
+        emissiveIntensity: 0.08,
         transparent: true,
-        opacity: 0.12,
+        opacity: 0.08,
         depthWrite: false,
       });
       const mirrorBars = new THREE.InstancedMesh(barGeo, mirrorMat, BAR_COUNT);
@@ -511,6 +521,17 @@ export function Spectrum3D({
           timer.update();
           const t = timer.getElapsed();
           const currentAnalyser = analyserRef.current;
+          const tickDt = lastTickMs ? Math.min(0.05, (now - lastTickMs) / 1000) : 0.016;
+          lastTickMs = now;
+
+          if (listingFloor) {
+            listingFloor.update({
+              playing: isPlaying && !reduceMotion,
+              dt: tickDt,
+              title: demoTitleRef.current,
+              text: demoTextRef.current,
+            });
+          }
 
           if (currentAnalyser) {
             if (!freqBuffer || freqBuffer.length !== currentAnalyser.frequencyBinCount) {
@@ -625,6 +646,8 @@ export function Spectrum3D({
           mirror.dispose();
           mirror = undefined;
         }
+        listingFloor?.dispose();
+        listingFloor = undefined;
         disposeObject(scene);
         backdropTexture?.dispose();
         renderer?.dispose();
@@ -647,28 +670,23 @@ export function Spectrum3D({
     }
   }, [fallback, isBackdrop]);
 
-  if (fallback) {
-    return (
-      <div className={`spectrum-3d-shell${isBackdrop ? ' is-backdrop' : ''}`}>
-        <div className={`spectrum-3d-fallback${isBackdrop ? ' is-backdrop' : ''}`}>
-          <MiniSpectrum analyser={analyser} playing={playing} variant="stage" />
-        </div>
-        {demoText && demoTitle ? (
-          <AmigaDemoScroll title={demoTitle} text={demoText} playing={playing} />
-        ) : null}
-      </div>
-    );
-  }
+  const stage = fallback ? (
+    <div className={`spectrum-3d-fallback${isBackdrop ? ' is-backdrop' : ''}`}>
+      <MiniSpectrum analyser={analyser} playing={playing} variant="stage" />
+    </div>
+  ) : (
+    <div
+      ref={hostRef}
+      className={`spectrum-3d${isBackdrop ? ' is-backdrop' : ''}`}
+      aria-hidden="true"
+    />
+  );
 
   return (
     <div className={`spectrum-3d-shell${isBackdrop ? ' is-backdrop' : ''}`}>
-      <div
-        ref={hostRef}
-        className={`spectrum-3d${isBackdrop ? ' is-backdrop' : ''}`}
-        aria-hidden="true"
-      />
-      {demoText && demoTitle ? (
-        <AmigaDemoScroll title={demoTitle} text={demoText} playing={playing} />
+      {stage}
+      {showAmigaDemo ? (
+        <AmigaDemoScroll title={demoTitle!} text={demoText!} playing={playing} />
       ) : null}
     </div>
   );
