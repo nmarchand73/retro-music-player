@@ -42,11 +42,30 @@ function persist(next: Track[]): void {
   persistPrefsPatch({ bookmarks: next });
 }
 
-function coversChanged(before: Track[], after: Track[]): boolean {
+/** Catalog fields refreshed from the live index (covers, songs, origin, …). */
+function catalogFieldsChanged(before: Track, after: Track): boolean {
+  return (
+    before.coverUrl !== after.coverUrl ||
+    before.game !== after.game ||
+    before.subsongCount !== after.subsongCount ||
+    JSON.stringify(before.songDurations ?? null) !== JSON.stringify(after.songDurations ?? null) ||
+    before.durationSeconds !== after.durationSeconds ||
+    before.originalGame !== after.originalGame ||
+    before.originKind !== after.originKind ||
+    before.title !== after.title ||
+    before.artist !== after.artist ||
+    before.year !== after.year ||
+    before.notes !== after.notes ||
+    before.format !== after.format ||
+    before.platform !== after.platform
+  );
+}
+
+function bookmarksNeedPersist(before: Track[], after: Track[]): boolean {
   if (before.length !== after.length) return true;
   return before.some((track, index) => {
     const next = after[index];
-    return !next || trackKey(track) !== trackKey(next) || track.coverUrl !== next.coverUrl || track.game !== next.game;
+    return !next || trackKey(track) !== trackKey(next) || catalogFieldsChanged(track, next);
   });
 }
 
@@ -67,8 +86,9 @@ export function useBookmarks() {
           persist(stored);
         }
         if (stored.length === 0) return;
+        // Re-pull live index metadata (subsongCount, origin, covers, …) for saved titles.
         return hydrateTrackCovers(stored).then((hydrated) => {
-          if (cancelled || !coversChanged(stored, hydrated)) return;
+          if (cancelled || !bookmarksNeedPersist(stored, hydrated)) return;
           persist(hydrated);
           setBookmarks(hydrated);
         });
@@ -106,7 +126,7 @@ export function useBookmarks() {
           const index = prev.findIndex((entry) => trackKey(entry) === key);
           if (index < 0) return prev;
           const current = prev[index];
-          if (!current || (current.coverUrl === hydrated.coverUrl && current.game === hydrated.game)) {
+          if (!current || !catalogFieldsChanged(current, hydrated)) {
             return prev;
           }
           const next = [...prev];
@@ -126,11 +146,7 @@ export function useBookmarks() {
       const current = prev[index];
       if (!current) return prev;
       const nextTrack = { ...current, ...patch };
-      if (
-        nextTrack.durationSeconds === current.durationSeconds &&
-        nextTrack.coverUrl === current.coverUrl &&
-        nextTrack.game === current.game
-      ) {
+      if (!catalogFieldsChanged(current, nextTrack)) {
         return prev;
       }
       const next = [...prev];

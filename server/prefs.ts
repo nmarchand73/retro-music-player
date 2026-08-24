@@ -7,6 +7,7 @@ export type StoredPrefs = {
   audioFx?: unknown;
   bookmarks?: unknown;
   libraryFilters?: unknown;
+  visualizer?: unknown;
 };
 
 function prefsFilePath(): string {
@@ -35,6 +36,10 @@ export async function readPrefs(): Promise<StoredPrefs> {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') return {};
+    if (err instanceof SyntaxError) {
+      console.warn('[prefs] ignoring corrupt prefs file:', err.message);
+      return {};
+    }
     throw err;
   }
 }
@@ -48,6 +53,7 @@ export async function writePrefs(patch: StoredPrefs): Promise<StoredPrefs> {
   if ('audioFx' in patch) next.audioFx = patch.audioFx;
   if ('bookmarks' in patch) next.bookmarks = patch.bookmarks;
   if ('libraryFilters' in patch) next.libraryFilters = patch.libraryFilters;
+  if ('visualizer' in patch) next.visualizer = patch.visualizer;
   await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   return next;
 }

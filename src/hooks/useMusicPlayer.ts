@@ -84,7 +84,7 @@ export type PlayerStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
 /** Chip channel mute state for YM (A/B/C) or SID (1/2/3). */
 export type ChipChannelMutes = {
-  kind: 'ym' | 'sid';
+  kind: 'ym' | 'sid' | 'mod';
   muted: [boolean, boolean, boolean];
 };
 
@@ -137,6 +137,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackerRef = useRef<TrackerPlayer | null>(null);
   const sidPlayerRef = useRef<SidPlayer | null>(null);
+  const sidSongDurationsRef = useRef<number[] | null>(null);
   const ymPlayerRef = useRef<Ym2149Player | null>(null);
   const ymNodeRef = useRef<ScriptProcessorNode | null>(null);
   const ymBytesRef = useRef<Uint8Array | null>(null);
@@ -214,6 +215,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       sidPlayerRef.current.stop();
       sidPlayerRef.current = null;
     }
+    sidSongDurationsRef.current = null;
 
     if (ymNodeRef.current) {
       ymNodeRef.current.disconnect();
@@ -413,6 +415,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
   const playSid = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext, track: Track) => {
     const player = new SidPlayer();
     sidPlayerRef.current = player;
+    sidSongDurationsRef.current = track.songDurations ?? null;
     endedRef.current = false;
 
     player.setOnEnded(() => {
@@ -462,14 +465,27 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
     for (let voice = 0; voice < 3; voice += 1) {
       player.setVoiceMute(voice, false);
     }
+    const meta = player.getSubsongInfo();
+    const count = Math.max(1, track.subsongCount ?? 0, meta?.songs ?? 0);
+    const current = meta?.currentSong && meta.currentSong > 0 ? meta.currentSong : 1;
+    const songDuration =
+      track.songDurations?.[current - 1] ??
+      track.songDurations?.[0] ??
+      track.durationSeconds ??
+      null;
+    if (songDuration != null && songDuration > 0) {
+      player.setDurationSeconds(songDuration);
+    }
     setState((prev) => ({
       ...prev,
       status: 'playing',
-      duration: track.durationSeconds ?? 0,
+      duration: songDuration ?? 0,
       trackerSong: null,
       trackerPlayback: null,
       analyser,
       channelMutes: { kind: 'sid', muted: [...OPEN_CHANNELS] },
+      subsong: count > 1 ? current : null,
+      subsongCount: count > 1 ? count : 0,
     }));
   }, [ensureFxBus]);
 
@@ -490,7 +506,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
             duration: Number(meta.dur ?? player.duration ?? 0),
             trackerSong: toTrackerSong(meta as { song?: TrackerSong }),
             analyser,
-            channelMutes: null,
+            channelMutes: { kind: 'mod', muted: [...OPEN_CHANNELS] },
           }));
         });
         player.onEnded(() => {
@@ -515,7 +531,12 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
           }));
         });
         player.play(arrayBuffer);
-        setState((prev) => ({ ...prev, status: 'playing', analyser, channelMutes: null }));
+        setState((prev) => ({
+          ...prev,
+          status: 'playing',
+          analyser,
+          channelMutes: prev.channelMutes ?? { kind: 'mod', muted: [...OPEN_CHANNELS] },
+        }));
         resolve();
       });
       return;
@@ -669,6 +690,36 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
   }, [stopAll]);
 
   const setSubsong = useCallback((index: number) => {
+    const sid = sidPlayerRef.current;
+    if (sid) {
+      const meta = sid.getSubsongInfo();
+      const count = Math.max(1, meta?.songs ?? 1);
+      const next = Math.min(Math.max(Math.round(index), 1), count);
+      if (count <= 1) return false;
+      if (meta?.currentSong === next) return true;
+
+      void (async () => {
+        const durations = sidSongDurationsRef.current;
+        const songDuration =
+          durations?.[next - 1] ?? (next === 1 ? durations?.[0] : undefined) ?? null;
+        const applied = await sid.selectSong(next, songDuration);
+        if (applied < 1) return;
+        endedRef.current = false;
+        setState((prev) => ({
+          ...prev,
+          position: 0,
+          duration: songDuration ?? 0,
+          status: 'playing',
+          subsong: applied,
+          subsongCount: count,
+          channelMutes: prev.channelMutes?.kind === 'sid'
+            ? prev.channelMutes
+            : { kind: 'sid', muted: [...OPEN_CHANNELS] },
+        }));
+      })();
+      return true;
+    }
+
     const ym = ymPlayerRef.current;
     const bytes = ymBytesRef.current;
     if (!ym || !bytes) return false;
@@ -743,6 +794,22 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
         const muted: ChipChannelMutes['muted'] = [...prev.channelMutes.muted];
         muted[index] = mute;
         return { ...prev, channelMutes: { kind: 'sid', muted } };
+      });
+      return;
+    }
+
+    const tracker = trackerRef.current;
+    if (tracker) {
+      tracker.setChannelMute(index, mute);
+      setState((prev) => {
+        if (!prev.channelMutes || prev.channelMutes.kind !== 'mod') {
+          const muted: ChipChannelMutes['muted'] = [...OPEN_CHANNELS];
+          muted[index] = mute;
+          return { ...prev, channelMutes: { kind: 'mod', muted } };
+        }
+        const muted: ChipChannelMutes['muted'] = [...prev.channelMutes.muted];
+        muted[index] = mute;
+        return { ...prev, channelMutes: { kind: 'mod', muted } };
       });
     }
   }, []);

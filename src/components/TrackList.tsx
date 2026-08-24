@@ -22,6 +22,7 @@ import { TrackCover } from './TrackCover';
 import type { MachineId, MachineSettings } from '../utils/machines';
 import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
 import type { FxPreviewTracks } from '../hooks/useFxPreviewTracks';
+import type { VisualizerMode } from '../utils/visualizerMode';
 
 export type LibraryView = 'library' | 'bookmarks' | 'top-games' | 'insights' | 'settings';
 
@@ -54,6 +55,8 @@ interface TrackListProps {
   onAudioFxEnabled: (enabled: boolean) => void;
   onAudioFxPreset: (preset: FxPreset) => void;
   onAudioFxAmount: (amount: number) => void;
+  visualizerMode: VisualizerMode;
+  onVisualizerMode: (mode: VisualizerMode) => void;
   fxPreviewTracks: FxPreviewTracks;
   fxPreviewLoading: boolean;
 }
@@ -353,6 +356,8 @@ export function TrackList({
   onAudioFxEnabled,
   onAudioFxPreset,
   onAudioFxAmount,
+  visualizerMode,
+  onVisualizerMode,
   fxPreviewTracks,
   fxPreviewLoading,
 }: TrackListProps) {
@@ -484,6 +489,8 @@ export function TrackList({
           onAudioFxEnabled={onAudioFxEnabled}
           onAudioFxPreset={onAudioFxPreset}
           onAudioFxAmount={onAudioFxAmount}
+          visualizerMode={visualizerMode}
+          onVisualizerMode={onVisualizerMode}
           previewTracks={fxPreviewTracks}
           previewLoading={fxPreviewLoading}
           currentTrackId={currentTrackId}

@@ -34,6 +34,8 @@ export interface C64Record {
   durationSeconds?: number;
   /** PSID/RSID song count when greater than 1. */
   subsongCount?: number;
+  /** Per-song HVSC lengths (index 0 = song 1). */
+  songDurations?: number[];
   timestamp?: string;
   sizeBytes: number;
   originalGame: boolean;
@@ -77,8 +79,8 @@ function normalizeSonglengthPath(raw: string): string {
   return raw.trim().replace(/\\/g, '/').replace(/^\//, '');
 }
 
-async function loadSonglengths(root: string): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
+async function loadSonglengths(root: string): Promise<Map<string, number[]>> {
+  const map = new Map<string, number[]>();
   const filePath = path.join(root, 'DOCUMENTS', 'Songlengths.md5');
   let text: string;
   try {
@@ -99,10 +101,14 @@ async function loadSonglengths(root: string): Promise<Map<string, number>> {
     if (!currentPath) continue;
     const eq = trimmed.indexOf('=');
     if (eq < 0) continue;
-    const durations = trimmed.slice(eq + 1).trim().split(/\s+/);
-    const first = parseDurationToken(durations[0] ?? '');
-    if (first != null && first > 0) {
-      map.set(currentPath, first);
+    const tokens = trimmed.slice(eq + 1).trim().split(/\s+/);
+    const durations: number[] = [];
+    for (const token of tokens) {
+      const seconds = parseDurationToken(token);
+      if (seconds != null && seconds > 0) durations.push(seconds);
+    }
+    if (durations.length > 0) {
+      map.set(currentPath, durations);
     }
   }
 
@@ -154,6 +160,7 @@ function toTrack(record: C64Record): Track {
     year: record.year,
     durationSeconds: record.durationSeconds,
     subsongCount: record.subsongCount,
+    songDurations: record.songDurations,
     timestamp: record.timestamp,
     originalGame: record.originalGame,
     originKind: record.originKind,
@@ -185,7 +192,7 @@ async function listSidFiles(root: string): Promise<string[]> {
 async function indexFile(
   root: string,
   absolutePath: string,
-  songlengths: Map<string, number>,
+  songlengths: Map<string, number[]>,
 ): Promise<C64Record | null> {
   const relativePath = path.relative(root, absolutePath).split(path.sep).join('/');
   const handle = await fs.open(absolutePath, 'r');
@@ -214,9 +221,12 @@ async function indexFile(
       ['HVSC', released, origin.originalGame ? undefined : ORIGIN_KIND_LABELS[origin.originKind]]
         .filter(Boolean)
         .join(' · ') || undefined;
-    const durationSeconds = songlengths.get(relativePath);
     const songs = buf.readUInt16BE(0x0e);
+    const startSong = Math.max(1, buf.readUInt16BE(0x10) || 1);
     const subsongCount = songs > 1 ? songs : undefined;
+    const songDurations = songlengths.get(relativePath);
+    const durationSeconds =
+      songDurations?.[Math.min(startSong, songDurations.length) - 1] ?? songDurations?.[0];
     const stat = await handle.stat();
 
     return {
@@ -231,6 +241,7 @@ async function indexFile(
       notes,
       durationSeconds,
       subsongCount,
+      songDurations: songDurations && songDurations.length > 0 ? songDurations : undefined,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
       originalGame: origin.originalGame,

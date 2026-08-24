@@ -37,6 +37,7 @@ export class SidPlayer {
   private pending: Int16Array | null = null;
   private pendingOffset = 0;
   private ended = false;
+  private voiceMuted: [boolean, boolean, boolean] = [false, false, false];
   private onEnded: (() => void) | null = null;
   private progressTimer: number | null = null;
   private onProgress: ((position: number, duration: number) => void) | null = null;
@@ -47,6 +48,8 @@ export class SidPlayer {
     durationSeconds?: number | null,
     fxBus?: AudioFxBus | null,
     fxSettings?: AudioFxSettings | null,
+    /** 1-based song when known; omit to use the SID header start song. */
+    song?: number | null,
   ): Promise<AnalyserNode> {
     this.stop();
 
@@ -60,8 +63,16 @@ export class SidPlayer {
     this.durationSeconds = durationSeconds != null && durationSeconds > 0 ? durationSeconds : null;
     this.paused = false;
     this.ended = false;
+    this.voiceMuted = [false, false, false];
 
-    await engine.loadSidBuffer(new Uint8Array(arrayBuffer));
+    const initialZeroBased =
+      song != null && song > 0 ? Math.max(0, Math.round(song) - 1) : null;
+    const buffer = new Uint8Array(arrayBuffer);
+    if (initialZeroBased != null) {
+      await engine.loadSidBuffer(buffer, initialZeroBased);
+    } else {
+      await engine.loadSidBuffer(buffer);
+    }
 
     const analyser = createAnalyser(ctx);
     this.analyser = analyser;
@@ -146,6 +157,35 @@ export class SidPlayer {
     return analyser;
   }
 
+  /** 1-based song count / current song from the loaded tune. */
+  getSubsongInfo(): { songs: number; currentSong: number } | null {
+    const info = this.engine?.getTuneInfo();
+    if (!info || info.songs < 1) return null;
+    const current =
+      info.currentSong > 0 ? info.currentSong : info.startSong > 0 ? info.startSong : 1;
+    return { songs: info.songs, currentSong: Math.min(current, info.songs) };
+  }
+
+  /**
+   * Switch to a 1-based song (matches Atari SNDH UI). SidAudioEngine uses 0-based indexes.
+   */
+  async selectSong(oneBased: number, durationSeconds?: number | null): Promise<number> {
+    if (!this.engine) return 0;
+    const info = this.engine.getTuneInfo();
+    const songs = info?.songs && info.songs > 0 ? info.songs : 1;
+    const next = Math.min(Math.max(1, Math.round(oneBased)), songs);
+    await this.engine.selectSong(next - 1);
+    this.pending = null;
+    this.pendingOffset = 0;
+    this.ended = false;
+    this.paused = false;
+    if (durationSeconds != null && durationSeconds > 0) {
+      this.durationSeconds = durationSeconds;
+    }
+    this.applyVoiceMutes();
+    return next;
+  }
+
   setOnEnded(handler: (() => void) | null): void {
     this.onEnded = handler;
   }
@@ -177,6 +217,7 @@ export class SidPlayer {
       await this.engine.seekSeconds(next);
       this.ended = duration != null && next >= duration;
       if (!this.ended) this.paused = false;
+      this.applyVoiceMutes();
     } finally {
       this.seeking = false;
     }
@@ -190,10 +231,22 @@ export class SidPlayer {
     return this.durationSeconds;
   }
 
-  /** Mute SID voice 0..2 on chip 0. */
+  setDurationSeconds(seconds: number | null): void {
+    this.durationSeconds = seconds != null && seconds > 0 ? seconds : null;
+  }
+
+  /** Mute SID voice 0..2 on chip 0. libsidplayfp: enable=true silences the voice. */
   setVoiceMute(voice: number, mute: boolean): void {
     if (!this.engine || voice < 0 || voice > 2) return;
+    this.voiceMuted[voice] = mute;
     this.engine.mute(0, voice, mute);
+  }
+
+  private applyVoiceMutes(): void {
+    if (!this.engine) return;
+    for (let voice = 0; voice < 3; voice += 1) {
+      this.engine.mute(0, voice, this.voiceMuted[voice]!);
+    }
   }
 
   stop(): void {

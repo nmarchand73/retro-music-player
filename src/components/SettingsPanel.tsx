@@ -10,6 +10,8 @@ import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
 import type { PlayerStatus } from '../hooks/useMusicPlayer';
 import type { FxPreviewTracks } from '../hooks/useFxPreviewTracks';
 import type { Track } from '../types';
+import type { VisualizerMode } from '../utils/visualizerMode';
+import { VISUALIZER_MODE_LABELS, VISUALIZER_MODES } from '../utils/visualizerMode';
 import { formatTitleDuration } from '../utils/formatTime';
 import { trackKey } from '../utils/trackKey';
 
@@ -42,6 +44,8 @@ interface SettingsPanelProps {
   onAudioFxEnabled: (enabled: boolean) => void;
   onAudioFxPreset: (preset: FxPreset) => void;
   onAudioFxAmount: (amount: number) => void;
+  visualizerMode: VisualizerMode;
+  onVisualizerMode: (mode: VisualizerMode) => void;
   previewTracks: FxPreviewTracks;
   previewLoading: boolean;
   currentTrackId: string | null;
@@ -62,6 +66,8 @@ export function SettingsPanel({
   onAudioFxEnabled,
   onAudioFxPreset,
   onAudioFxAmount,
+  visualizerMode,
+  onVisualizerMode,
   previewTracks,
   previewLoading,
   currentTrackId,
@@ -121,6 +127,42 @@ export function SettingsPanel({
             <span className="muted">Hide Amiga formats the current engines cannot decode.</span>
           </span>
         </label>
+      </section>
+
+      <section className="settings-visualizer" aria-labelledby="settings-visualizer-heading">
+        <h3 className="settings-section-heading" id="settings-visualizer-heading">
+          Player visualizer
+        </h3>
+        <p className="muted">
+          Expanded player stage: Spectrum 3D bars, or a vertical piano roll (Amiga tracker notes when
+          available; otherwise pitch from the live spectrum).
+        </p>
+        <fieldset className="settings-visualizer-choices">
+          <legend className="sr-only">Player visualizer mode</legend>
+          {VISUALIZER_MODES.map((mode) => {
+            const selected = visualizerMode === mode;
+            return (
+              <label key={mode} className={`settings-machine-row${selected ? ' is-on' : ''}`}>
+                <input
+                  type="radio"
+                  name="visualizer-mode"
+                  value={mode}
+                  checked={selected}
+                  aria-label={VISUALIZER_MODE_LABELS[mode]}
+                  onChange={() => onVisualizerMode(mode)}
+                />
+                <span className="settings-machine-copy">
+                  <strong>{VISUALIZER_MODE_LABELS[mode]}</strong>
+                  <span className="muted">
+                    {mode === 'spectrum3d'
+                      ? 'Mirrored frequency bars (default).'
+                      : 'Scrolling notes over a keyboard.'}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
       </section>
 
       <section className="settings-audio-fx" aria-labelledby="settings-audio-fx-heading">

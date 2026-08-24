@@ -111,6 +111,10 @@ export class TrackerPlayer {
     );
   }
 
+  setChannelMute(channel: number, mute: boolean) {
+    this.postMsg('setChannelMute', { channel, mute });
+  }
+
   postMsg(cmd: string, val?: unknown) {
     this.processNode?.port.postMessage({ cmd, val });
   }

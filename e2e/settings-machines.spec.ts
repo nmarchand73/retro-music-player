@@ -66,6 +66,25 @@ test.describe('Machine settings defaults', () => {
     await expect(page.getByText(/Amount · 80%/)).toBeVisible();
   });
 
+  test('settings player visualizer can switch to piano roll', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.removeItem('retro-music-player:visualizer'));
+    await page.reload();
+
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Player visualizer' })).toBeVisible();
+
+    const spectrum = page.getByRole('radio', { name: 'Spectrum 3D' });
+    const piano = page.getByRole('radio', { name: 'Piano roll' });
+    await expect(spectrum).toBeChecked();
+    await piano.check();
+    await expect(piano).toBeChecked();
+
+    await page.reload();
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await expect(page.getByRole('radio', { name: 'Piano roll' })).toBeChecked();
+  });
+
   test('settings Listening samples play one track per platform', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto('/');

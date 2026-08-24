@@ -2,12 +2,15 @@ import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { BookmarkButton } from './BookmarkButton';
 import { MarqueeText } from './MarqueeText';
 import { MiniSpectrum } from './MiniSpectrum';
+import { PianoRoll } from './PianoRoll';
 import { Spectrum3D } from './Spectrum3D';
 import { TrackCover } from './TrackCover';
 import { lookupGameHistory } from '../data/topGames';
 import type { ChipChannelMutes, PlayerStatus } from '../hooks/useMusicPlayer';
 import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
 import type { Track } from '../types';
+import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
+import type { VisualizerMode } from '../utils/visualizerMode';
 import { formatClock, formatDuration } from '../utils/formatTime';
 
 function playerPlatformLabel(platform: Track['platform']): string {
@@ -56,6 +59,9 @@ interface PlayerBarProps {
   onAudioFxEnabled: (enabled: boolean) => void;
   onAudioFxPreset: (preset: FxPreset) => void;
   onAudioFxAmount: (amount: number) => void;
+  visualizerMode: VisualizerMode;
+  trackerSong?: TrackerSong | null;
+  trackerPlayback?: TrackerPlayback | null;
 }
 
 function subsongLabel(index: number, count: number, track: Track | null): string {
@@ -71,6 +77,7 @@ function subsongLabel(index: number, count: number, track: Track | null): string
   if (count === 2 && /samples?\s*\/\s*chip|chip only/i.test(notes)) {
     return index === 1 ? 'Samples + chip' : 'Chip only';
   }
+  if (track?.platform === 'c64') return `Song ${index}`;
   return `Tune ${index}`;
 }
 
@@ -93,12 +100,12 @@ function SubsongControls({
     <div
       className={`player-subsong${compact ? ' is-compact' : ''}`}
       role="group"
-      aria-label="SNDH subtunes"
+      aria-label={track?.platform === 'c64' ? 'SID songs' : 'Subtunes'}
     >
       <button
         type="button"
         className="player-subsong-btn"
-        aria-label="Previous subtune"
+        aria-label={track?.platform === 'c64' ? 'Previous song' : 'Previous subtune'}
         disabled={subsong <= 1}
         onClick={() => onSubsong(subsong - 1)}
       >
@@ -110,7 +117,7 @@ function SubsongControls({
       <button
         type="button"
         className="player-subsong-btn"
-        aria-label="Next subtune"
+        aria-label={track?.platform === 'c64' ? 'Next song' : 'Next subtune'}
         disabled={subsong >= subsongCount}
         onClick={() => onSubsong(subsong + 1)}
       >
@@ -130,12 +137,23 @@ function ChannelMuteControls({
   compact?: boolean;
 }) {
   const labels = channelMutes.kind === 'ym' ? YM_CHANNEL_LABELS : SID_CHANNEL_LABELS;
-  const kindLabel = channelMutes.kind === 'ym' ? 'AY channel' : 'SID voice';
+  const kindLabel =
+    channelMutes.kind === 'ym'
+      ? 'AY channel'
+      : channelMutes.kind === 'sid'
+        ? 'SID voice'
+        : 'MOD channel';
   return (
     <div
       className={`player-channel-mutes${compact ? ' is-compact' : ''}`}
       role="group"
-      aria-label={channelMutes.kind === 'ym' ? 'AY channels' : 'SID voices'}
+      aria-label={
+        channelMutes.kind === 'ym'
+          ? 'AY channels'
+          : channelMutes.kind === 'sid'
+            ? 'SID voices'
+            : 'MOD channels'
+      }
     >
       {!compact ? <span className="player-channel-mutes-label">Channels</span> : null}
       {labels.map((label, index) => {
@@ -326,6 +344,9 @@ export function PlayerBar({
   onAudioFxEnabled,
   onAudioFxPreset,
   onAudioFxAmount,
+  visualizerMode,
+  trackerSong = null,
+  trackerPlayback = null,
 }: PlayerBarProps) {
   const canSeek = duration > 0;
   const showPause = status === 'playing';
@@ -504,13 +525,23 @@ export function PlayerBar({
         </aside>
 
         <div className="player-stage-viz">
-          <Spectrum3D
-            analyser={analyser}
-            playing={playing}
-            variant="panel"
-            demoTitle={demo?.title ?? null}
-            demoText={demo?.history ?? null}
-          />
+          {visualizerMode === 'pianoRoll' ? (
+            <PianoRoll
+              analyser={analyser}
+              playing={playing}
+              playbackPosition={position}
+              trackerSong={trackerSong}
+              trackerPlayback={trackerPlayback}
+            />
+          ) : (
+            <Spectrum3D
+              analyser={analyser}
+              playing={playing}
+              variant="panel"
+              demoTitle={demo?.title ?? null}
+              demoText={demo?.history ?? null}
+            />
+          )}
         </div>
       </div>
 

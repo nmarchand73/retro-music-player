@@ -40,6 +40,13 @@ const NOTE_FADE = 253;
 const NOTE_CUT = 254;
 const NOTE_OFF = 255;
 
+/** openmpt note 1..120 → MIDI (C-0 → 12). Specials / empty → null. */
+export function openmptNoteToMidi(value: number): number | null {
+  if (!value || value === NOTE_FADE || value === NOTE_CUT || value === NOTE_OFF) return null;
+  if (value < 1 || value > 120) return null;
+  return value + 11;
+}
+
 function formatNote(value: number): string {
   if (!value) return '...';
   if (value === NOTE_FADE) return '~~~';

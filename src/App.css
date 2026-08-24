@@ -1476,6 +1476,73 @@ select:focus-visible,
   min-height: clamp(16rem, 34vh, 24rem);
 }
 
+.player-stage-viz .piano-roll {
+  height: 100%;
+  min-height: clamp(16rem, 34vh, 24rem);
+}
+
+.piano-roll {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: clamp(16rem, 34vh, 24rem);
+  background: #1c1230;
+}
+
+.piano-roll-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.piano-roll-badge {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.65rem;
+  z-index: 1;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 248, 238, 0.55);
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.settings-visualizer {
+  margin: 1.25rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.settings-visualizer > .muted {
+  margin: 0.35rem 0 0.85rem;
+  max-width: 42rem;
+}
+
+.settings-visualizer-choices {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.settings-visualizer-choices .settings-machine-row input[type='radio'] {
+  accent-color: var(--accent, #e2185a);
+}
+
 .player-hud-dock {
   position: relative;
   z-index: 1;
@@ -2460,7 +2527,8 @@ select:focus-visible,
 
   .player-stage-viz,
   .player-stage-viz .spectrum-3d,
-  .player-stage-viz .spectrum-3d-shell {
+  .player-stage-viz .spectrum-3d-shell,
+  .player-stage-viz .piano-roll {
     min-height: clamp(12rem, 28vh, 18rem);
   }
 

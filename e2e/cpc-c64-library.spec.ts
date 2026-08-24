@@ -82,4 +82,56 @@ test.describe('CPC and C64 local libraries', () => {
     await expect(c64Row.getByText('SID')).toBeVisible();
     await expect(c64Row.getByRole('button', { name: 'Search platform C64' })).toBeVisible();
   });
+
+  test('C64 multi-song SID can switch songs in the player', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/');
+
+    await page.getByRole('combobox', { name: 'Platform' }).selectOption('c64');
+    await page.getByRole('searchbox', { name: 'Search music' }).fill('Addicta Ball');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+    const row = page
+      .locator('.track-list li')
+      .filter({ has: page.locator('[data-platform="c64"]') })
+      .filter({ has: page.getByRole('button', { name: /Search title Addicta Ball/i }) })
+      .first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await expect(row.locator('.chip.subtunes')).toHaveText('2 songs');
+
+    await row.getByRole('button', { name: /Play Addicta Ball/i }).click();
+    const player = page.getByRole('contentinfo', { name: 'Player' });
+    await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 60_000 });
+    await expect(player.locator('[aria-label="SID songs"]')).toBeVisible();
+    await expect(player.getByText('1/2')).toBeVisible();
+    await expect(player.locator('.player-title-duration')).toHaveText('0:04');
+
+    await player.getByRole('button', { name: 'Next song' }).click();
+    await expect(player.getByText('2/2')).toBeVisible({ timeout: 10_000 });
+    // Addicta Ball HVSC lengths: 0:04 then 0:02
+    await expect(player.locator('.player-title-duration')).toHaveText('0:02', { timeout: 10_000 });
+  });
+
+  test('C64 SID channel mute toggles voice buttons', async ({ page }) => {
+    test.setTimeout(90_000);
+    await page.goto('/');
+
+    await page.getByRole('combobox', { name: 'Platform' }).selectOption('c64');
+    await page.getByRole('searchbox', { name: 'Search music' }).fill('Commando');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+    const row = page.locator('.track-list li').filter({ has: page.locator('[data-platform="c64"]') }).first();
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.getByRole('button', { name: /Play Commando/i }).click();
+
+    const player = page.getByRole('contentinfo', { name: 'Player' });
+    await expect(player.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 60_000 });
+
+    const voice1 = player.getByRole('button', { name: 'Mute SID voice 1' });
+    await expect(voice1).toBeVisible();
+    await voice1.click();
+    await expect(player.getByRole('button', { name: 'Unmute SID voice 1' })).toBeVisible();
+    await player.getByRole('button', { name: 'Unmute SID voice 1' }).click();
+    await expect(player.getByRole('button', { name: 'Mute SID voice 1' })).toBeVisible();
+  });
 });

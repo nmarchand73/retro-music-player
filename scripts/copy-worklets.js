@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const srcDir = path.join(root, 'node_modules', 'chiptune3');
+const vendorWorklet = path.join(root, 'vendor', 'chiptune3.worklet.js');
 const destDir = path.join(root, 'public');
 const files = ['libopenmpt.worklet.js', 'chiptune3.worklet.js'];
 
@@ -13,7 +14,10 @@ if (!fs.existsSync(destDir)) {
 }
 
 for (const file of files) {
-  const src = path.join(srcDir, file);
+  let src = path.join(srcDir, file);
+  if (file === 'chiptune3.worklet.js' && fs.existsSync(vendorWorklet)) {
+    src = vendorWorklet;
+  }
   if (!fs.existsSync(src)) {
     console.warn(`Missing ${file} in chiptune3 package`);
     continue;
@@ -29,6 +33,9 @@ for (const file of files) {
       "from '/libopenmpt.worklet.js'",
     );
     fs.writeFileSync(workletPath, patched);
+    if (src === vendorWorklet) {
+      fs.writeFileSync(vendorWorklet, patched);
+    }
   }
 }
 

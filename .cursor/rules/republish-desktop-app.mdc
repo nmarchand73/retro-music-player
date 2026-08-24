@@ -1,0 +1,38 @@
+---
+description: Rebuild and open the macOS desktop app after retro-music-player changes
+alwaysApply: true
+---
+
+# Republish desktop app
+
+When you finish work in **retro-music-player** (UI, player, server, settings, prefs, e2e, or desktop launcher), **rebuild and republish the macOS app** before considering the task done.
+
+## Required (macOS)
+
+From the project root:
+
+```bash
+npm run desktop:build && npm run desktop:open
+```
+
+- `desktop:build` → `dist-mac/Retro Music Player.app` (bundles fresh Vite UI + Express + native deps).
+- `desktop:open` launches the rebuilt bundle so the user tests the shipped app, not only `npm run dev`.
+
+Run this **every session** that changes product code — even small UI or settings tweaks. Do not skip because dev mode already looks fine.
+
+## When to skip
+
+- Question-only or read-only tasks (no code changes).
+- Non-macOS environment — say so and run `npm run build` + smoketest instead if applicable.
+
+## Order of operations
+
+1. Fix code / tests.
+2. `npm run smoketest` when user-facing flows or e2e changed.
+3. `npm run desktop:build && npm run desktop:open` on macOS.
+4. Report build success and that the app was opened.
+
+## Notes
+
+- Music archives live outside the bundle (`~/Library/Application Support/Retro Music Player/data`); rebuilds do not wipe the library.
+- If `desktop:build` fails, fix the error and rebuild — do not leave the task with a stale `.app`.

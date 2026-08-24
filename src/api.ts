@@ -84,6 +84,7 @@ export type ClientPrefsPayload = {
   audioFx?: unknown;
   bookmarks?: unknown;
   libraryFilters?: unknown;
+  visualizer?: unknown;
 };
 
 export async function fetchPrefs(): Promise<ClientPrefsPayload> {

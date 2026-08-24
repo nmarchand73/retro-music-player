@@ -139,6 +139,7 @@ app.put('/api/prefs', async (req, res) => {
       audioFx?: unknown;
       bookmarks?: unknown;
       libraryFilters?: unknown;
+      visualizer?: unknown;
     };
     res.json(await writePrefs(patch));
   } catch (err) {

@@ -10,6 +10,7 @@ import { useLibraryFilters } from './hooks/useLibraryFilters';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useFxPreviewTracks } from './hooks/useFxPreviewTracks';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
+import { useVisualizerSettings } from './hooks/useVisualizerSettings';
 import type { DatabaseInfo, LibrarySearch, MusicPlatform, SearchField, Track } from './types';
 import { SEARCH_FIELD_LABELS, SEARCH_FIELD_PLACEHOLDERS } from './types';
 import { sortTracks, type SortKey } from './utils/sortTracks';
@@ -34,6 +35,7 @@ function App() {
   const { originalOnly, playableOnly, setOriginalOnly, setPlayableOnly } = useLibraryFilters();
   const { audioFx, setEnabled: setAudioFxEnabled, setPreset: setAudioFxPreset, setAmount: setAudioFxAmount } =
     useAudioFxSettings();
+  const { visualizerMode, setVisualizerMode } = useVisualizerSettings();
   const { tracks: fxPreviewTracks, loading: fxPreviewLoading } = useFxPreviewTracks();
   const activeMachines = useMemo(() => enabledMachines(machines), [machines]);
   const machinesParam = useMemo(() => machinesQueryValue(machines), [machines]);
@@ -338,6 +340,8 @@ function App() {
           onAudioFxEnabled={setAudioFxEnabled}
           onAudioFxPreset={setAudioFxPreset}
           onAudioFxAmount={setAudioFxAmount}
+          visualizerMode={visualizerMode}
+          onVisualizerMode={setVisualizerMode}
           fxPreviewTracks={fxPreviewTracks}
           fxPreviewLoading={fxPreviewLoading}
         />
@@ -397,6 +401,9 @@ function App() {
           onAudioFxEnabled={setAudioFxEnabled}
           onAudioFxPreset={setAudioFxPreset}
           onAudioFxAmount={setAudioFxAmount}
+          visualizerMode={visualizerMode}
+          trackerSong={player.trackerSong}
+          trackerPlayback={player.trackerPlayback}
           onPlayPause={handlePlayPause}
           onStop={player.stop}
           onSeek={player.seek}
