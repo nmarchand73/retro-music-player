@@ -4,12 +4,13 @@
  * Writes src/data/topArcadeRankings.json and prints slugs for fetch-vgmrips.mjs.
  */
 
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_JSON = join(ROOT, 'src', 'data', 'topArcadeRankings.json');
+const FRANCE_JSON = join(ROOT, 'src', 'data', 'topFranceArcade80s90s.json');
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
 const BASE = 'https://vgmrips.net/packs/top';
 const TARGET = 100;
@@ -130,16 +131,65 @@ function mergeExtras(top) {
   return merged.slice(0, TARGET);
 }
 
+function normKey(entry) {
+  return (entry.searchQuery || entry.title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** France café/forain staples first, then VGMRips / extras to fill 100. */
+function mergeFranceFirst(vgmripsTop) {
+  let franceGames = [];
+  try {
+    const france = JSON.parse(readFileSync(FRANCE_JSON, 'utf8'));
+    franceGames = (france.games ?? []).map((entry) => ({
+      title: entry.title,
+      slug: entry.slug,
+      searchQuery: entry.searchQuery,
+    }));
+  } catch {
+    process.stderr.write(`Warning: could not read ${FRANCE_JSON}\n`);
+  }
+
+  const bySlug = new Set();
+  const byQuery = new Set();
+  const merged = [];
+
+  for (const entry of franceGames) {
+    if (!entry.slug || bySlug.has(entry.slug)) continue;
+    merged.push(entry);
+    bySlug.add(entry.slug);
+    byQuery.add(normKey(entry));
+  }
+
+  for (const entry of vgmripsTop) {
+    if (bySlug.has(entry.slug) || byQuery.has(normKey(entry))) continue;
+    merged.push({
+      title: entry.title,
+      slug: entry.slug,
+      searchQuery: entry.searchQuery ?? searchQueryFromTitle(entry.title),
+    });
+    bySlug.add(entry.slug);
+    byQuery.add(normKey(entry));
+    if (merged.length >= TARGET) break;
+  }
+
+  return merged.slice(0, TARGET);
+}
+
 function buildRankingsJson(games) {
   return {
     generated_at: new Date().toISOString().slice(0, 10),
     description:
-      'Top arcade VGM packs on VGMRips by global download ranking (Arcade folder), plus local Sega/Data East and brawler staples.',
+      'Top 100 arcade for Retro Music Player: French café/forain staples (late 80s–90s) first, then VGMRips global top-download packs.',
     source: {
-      name: 'VGMRips Top packs',
+      name: 'Arcade Top 100 (France + VGMRips)',
       url: 'https://vgmrips.net/packs/top',
-      method: 'First 100 unique arcade packs while paging the global top-download list',
-      note: 'Non-arcade entries on the global top list are skipped. A few curated coin-op staples are merged in when missing.',
+      method:
+        'France diffusions (reconstituted) prepended; remaining slots filled from VGMRips Arcade top downloads + curated staples',
+      note:
+        'No official French installation chart exists. France list from Play Meter/RePlay proxies + French oral history; rest from VGMRips.',
     },
     games: games.map((entry, index) => ({
       rank: index + 1,
@@ -158,11 +208,11 @@ async function main() {
     console.error(`Warning: only found ${top.length} arcade packs in top pages`);
   }
 
-  top = mergeExtras(top).slice(0, TARGET);
+  top = mergeFranceFirst(mergeExtras(top));
 
   if (writeJson) {
     writeFileSync(OUT_JSON, `${JSON.stringify(buildRankingsJson(top), null, 2)}\n`);
-    console.error(`Wrote ${OUT_JSON}`);
+    console.error(`Wrote ${OUT_JSON} (${top.length} games)`);
   }
 
   for (const entry of top) {

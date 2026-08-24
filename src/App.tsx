@@ -257,7 +257,7 @@ function App() {
         <div className="hero-top">
           <div className="hero-copy">
             <p className="eyebrow">Retro Music Library</p>
-            <h1>Atari · Amiga · CPC · C64</h1>
+            <h1>Atari · Amiga · CPC · C64 · Arcade</h1>
           </div>
           <DatabasePanel databases={databases} loading={dbLoading} />
         </div>

@@ -168,12 +168,12 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
       <div className="top-games-columns">
         {columns.map(({ column, games }) => (
           <section
-            key={`${kind}-${column.rankKey}`}
-            className={`top-games-column source-${column.rankKey}`}
-            aria-labelledby={`top-games-${kind}-${column.rankKey}`}
+            key={`${kind}-${column.id}`}
+            className={`top-games-column source-${column.id}`}
+            aria-labelledby={`top-games-${kind}-${column.id}`}
           >
             <header className="top-games-column-header">
-              <h3 id={`top-games-${kind}-${column.rankKey}`}>{column.short}</h3>
+              <h3 id={`top-games-${kind}-${column.id}`}>{column.short}</h3>
               <p className="muted">
                 <a
                   className="top-games-source-link"
@@ -197,14 +197,12 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                 const listLabel =
                   kind === 'music'
                     ? 'music Top 100'
-                    : column.rankKey === 'arcade-fr'
-                      ? 'Arcade FR diffusions'
-                      : column.id === 'arcade'
-                        ? 'VGMRips Top'
-                        : column.id === 'amiga'
-                          ? '101 Jeux'
-                          : 'Top 100';
-                const rowKey = `${kind}-${column.rankKey}-${displayRank}-${game.title}`;
+                    : column.id === 'arcade'
+                      ? 'Arcade Top 100'
+                      : column.id === 'amiga'
+                        ? '101 Jeux'
+                        : 'Top 100';
+                const rowKey = `${kind}-${column.id}-${displayRank}-${game.title}`;
                 const expanded = expandedKey === rowKey;
                 const hasHistory = Boolean(game.history);
                 return (

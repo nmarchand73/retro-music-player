@@ -4,7 +4,7 @@ test.describe('Library insights golden path', () => {
   test('open Insights, browse top composers and jump into a library search', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { level: 1, name: /Atari · Amiga · CPC · C64/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Atari · Amiga · CPC · C64 · Arcade/ })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Insights' })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Insights' }).click();
@@ -17,6 +17,7 @@ test.describe('Library insights golden path', () => {
     await expect(page.getByRole('heading', { name: 'Longest known' })).toBeVisible();
 
     await expect(page.getByLabel('Library overview')).toContainText(/Tracks/i);
+    await expect(page.getByLabel('Library overview')).toContainText(/Arcade VGM/i);
     await expect(page.getByLabel('Top composers').locator('.insight-rank-row').first()).toBeVisible();
 
     const firstComposer = page.getByLabel('Top composers').locator('.insight-rank-row').first();

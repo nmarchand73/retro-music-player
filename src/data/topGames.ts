@@ -2,14 +2,13 @@
 import gameRankings from './top100Rankings.json' with { type: 'json' };
 import musicRankings from './top100MusicRankings.json' with { type: 'json' };
 import arcadeRankings from './topArcadeRankings.json' with { type: 'json' };
-import franceArcadeRankings from './topFranceArcade80s90s.json' with { type: 'json' };
 import gameHistories from './topGameHistories.json' with { type: 'json' };
 
 export type TopGamePlatform = 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
 
 export type RankingKind = 'games' | 'music';
 
-export type RankSourceId = 'lemon' | 'atarimania' | 'cpc' | 'c64' | 'vgmrips' | 'arcade-fr';
+export type RankSourceId = 'lemon' | 'atarimania' | 'cpc' | 'c64' | 'vgmrips';
 
 export type RankSourceMode = 'ranked' | 'list';
 
@@ -377,35 +376,16 @@ function buildArcadePlatformColumn(): PlatformColumn {
   };
 }
 
-function buildFranceArcadePlatformColumn(): PlatformColumn {
-  const source = franceArcadeRankings.source;
-  return {
-    id: 'arcade',
-    short: 'Arcade FR',
-    label: source.name,
-    rankKey: 'arcade-fr',
-    url: source.url,
-    method: source.method,
-    note: [franceArcadeRankings.description, source.note].filter(Boolean).join(' — '),
-  };
-}
-
 export const PLATFORM_COLUMNS: PlatformColumn[] = buildGamePlatformColumns();
 export const MUSIC_PLATFORM_COLUMNS: PlatformColumn[] = buildMusicPlatformColumns();
 export const ARCADE_PLATFORM_COLUMN: PlatformColumn = buildArcadePlatformColumn();
-export const FRANCE_ARCADE_PLATFORM_COLUMN: PlatformColumn = buildFranceArcadePlatformColumn();
-
-const ARCADE_BEST_COLUMNS: PlatformColumn[] = [
-  FRANCE_ARCADE_PLATFORM_COLUMN,
-  ARCADE_PLATFORM_COLUMN,
-];
 
 export function platformColumnsFor(kind: RankingKind): PlatformColumn[] {
   switch (kind) {
     case 'games':
-      return [...PLATFORM_COLUMNS, ...ARCADE_BEST_COLUMNS];
+      return [...PLATFORM_COLUMNS, ARCADE_PLATFORM_COLUMN];
     case 'music':
-      return [...MUSIC_PLATFORM_COLUMNS, ...ARCADE_BEST_COLUMNS];
+      return [...MUSIC_PLATFORM_COLUMNS, ARCADE_PLATFORM_COLUMN];
     default: {
       const _exhaustive: never = kind;
       throw new Error(`Unhandled ranking kind: ${_exhaustive}`);
@@ -431,15 +411,6 @@ export const RANK_SOURCES: RankSource[] = [
     url: ARCADE_PLATFORM_COLUMN.url,
     method: ARCADE_PLATFORM_COLUMN.method,
     note: ARCADE_PLATFORM_COLUMN.note,
-  },
-  {
-    id: 'arcade-fr',
-    label: FRANCE_ARCADE_PLATFORM_COLUMN.label,
-    short: FRANCE_ARCADE_PLATFORM_COLUMN.short,
-    mode: 'ranked' as const,
-    url: FRANCE_ARCADE_PLATFORM_COLUMN.url,
-    method: FRANCE_ARCADE_PLATFORM_COLUMN.method,
-    note: FRANCE_ARCADE_PLATFORM_COLUMN.note,
   },
 ];
 
@@ -615,30 +586,16 @@ function buildFromArcadeRankings(): TopGame[] {
   });
 }
 
-function buildFromFranceArcadeRankings(): TopGame[] {
-  return franceArcadeRankings.games.map((entry) => {
-    const searchQuery = entry.searchQuery ?? rankingSearchQuery(entry.title);
-    return {
-      title: entry.title,
-      searchQuery,
-      platforms: ['arcade'],
-      ranks: { 'arcade-fr': entry.rank },
-      ...historyForTitle(entry.title),
-    };
-  });
-}
-
 export const TOP_GAMES: TopGame[] = buildFromGameRankings();
 export const TOP_MUSIC: TopGame[] = buildFromMusicRankings();
 export const TOP_ARCADE: TopGame[] = buildFromArcadeRankings();
-export const TOP_FRANCE_ARCADE: TopGame[] = buildFromFranceArcadeRankings();
 
 export function topEntriesFor(kind: RankingKind): TopGame[] {
   switch (kind) {
     case 'games':
-      return [...TOP_GAMES, ...TOP_ARCADE, ...TOP_FRANCE_ARCADE];
+      return [...TOP_GAMES, ...TOP_ARCADE];
     case 'music':
-      return [...TOP_MUSIC, ...TOP_ARCADE, ...TOP_FRANCE_ARCADE];
+      return [...TOP_MUSIC, ...TOP_ARCADE];
     default: {
       const _exhaustive: never = kind;
       throw new Error(`Unhandled ranking kind: ${_exhaustive}`);

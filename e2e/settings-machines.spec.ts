@@ -98,6 +98,7 @@ test.describe('Machine settings defaults', () => {
     await expect(samples.getByRole('button', { name: /Play k8 \(Amiga\)/i })).toBeVisible();
     await expect(samples.getByRole('button', { name: /Play Robocop \(Amstrad CPC\)/i })).toBeVisible();
     await expect(samples.getByRole('button', { name: /Play Commando \(Commodore 64\)/i })).toBeVisible();
+    await expect(samples.getByRole('button', { name: /Play Magical Sound Shower \(Arcade\)/i })).toBeVisible();
 
     await page.getByRole('checkbox', { name: 'Modern sound' }).check();
     await samples.getByRole('button', { name: /Play Last Ninja \(Atari ST\)/i }).click();

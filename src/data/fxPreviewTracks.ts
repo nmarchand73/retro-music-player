@@ -29,4 +29,9 @@ export const FX_PREVIEW_REFS: readonly FxPreviewRef[] = [
     source: 'c64',
     id: 'TVVTSUNJQU5TL0gvSHViYmFyZF9Sb2IvQ29tbWFuZG8uc2lk', // Rob Hubbard — Commando
   },
+  {
+    machine: 'arcade',
+    source: 'vgm',
+    id: 'QXJjYWRlL1NlZ2FTeXMvT3V0X1J1bl8oQXJjYWRlKS8wMSBNYWdpY2FsIFNvdW5kIFNob3dlci52Z3o', // Out Run — Magical Sound Shower
+  },
 ] as const;
