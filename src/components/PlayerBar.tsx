@@ -550,6 +550,13 @@ export function PlayerBar({
               variant="panel"
               demoTitle={demo?.title ?? null}
               demoText={demo?.history ?? null}
+              trackKey={track ? `${track.id}:${subsong ?? 1}` : null}
+              listingTitle={track?.title ?? null}
+              listingSubtitle={
+                track
+                  ? [track.artist, track.game].filter(Boolean).join(' · ') || null
+                  : null
+              }
             />
           )}
         </div>

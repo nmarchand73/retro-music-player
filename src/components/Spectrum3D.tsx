@@ -24,6 +24,10 @@ interface Spectrum3DProps {
   /** Optional Amiga-demo scrolltext (e.g. game history). */
   demoTitle?: string | null;
   demoText?: string | null;
+  /** Per-track key for green-bar listing rotation. */
+  trackKey?: string | null;
+  listingTitle?: string | null;
+  listingSubtitle?: string | null;
 }
 
 const levelsScratch = new Float32Array(BAR_COUNT);
@@ -272,12 +276,18 @@ export function Spectrum3D({
   variant = 'panel',
   demoTitle = null,
   demoText = null,
+  trackKey = null,
+  listingTitle = null,
+  listingSubtitle = null,
 }: Spectrum3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const analyserRef = useRef(analyser);
   const playingRef = useRef(playing);
   const demoTitleRef = useRef(demoTitle);
   const demoTextRef = useRef(demoText);
+  const trackKeyRef = useRef(trackKey);
+  const listingTitleRef = useRef(listingTitle);
+  const listingSubtitleRef = useRef(listingSubtitle);
   const [fallback, setFallback] = useState(false);
   const isBackdrop = variant === 'backdrop';
   /** History scroll + bounce-ball overlay (all platforms). */
@@ -287,6 +297,9 @@ export function Spectrum3D({
   playingRef.current = playing;
   demoTitleRef.current = demoTitle;
   demoTextRef.current = demoText;
+  trackKeyRef.current = trackKey;
+  listingTitleRef.current = listingTitle;
+  listingSubtitleRef.current = listingSubtitle;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -355,11 +368,11 @@ export function Spectrum3D({
       backdrop.position.set(0, 3.4, -5.6);
       scene.add(backdrop);
 
-      listingFloor = createGreenBarFloorTexture(640, 320);
+      listingFloor = createGreenBarFloorTexture(1024, 512);
       const listingMat = new THREE.MeshBasicMaterial({
         map: listingFloor.texture,
         transparent: true,
-        opacity: 0.72,
+        opacity: 0.85,
         depthWrite: false,
         toneMapped: false,
       });
@@ -510,8 +523,9 @@ export function Spectrum3D({
             listingFloor.update({
               playing: isPlaying && !reduceMotion,
               dt: tickDt,
-              title: demoTitleRef.current,
-              text: demoTextRef.current,
+              trackKey: trackKeyRef.current,
+              title: listingTitleRef.current,
+              text: listingSubtitleRef.current,
             });
           }
 
