@@ -30,6 +30,7 @@ Large music dumps under `data/` are gitignored — clone the repo, then add arch
 - **Commodore 64 SID**: [libsidplayfp-wasm](https://github.com/chrisgleissner/libsidplayfp-wasm) (SIDLite)
 - **Amiga trackers (MOD/XM/…)**: [chiptune3](https://github.com/jsschelling/chiptune3) / libopenmpt
 - **Amiga exotic formats (CUST/MDAT/RJP/AGI/…)**: [UADE](http://zakalwe.fi/uade/) via `uade123` on the server (renders to WAV)
+- **Atari digi/sample SNDH** (e.g. [Goldrunner](https://sndh.atari.org/?ID=1505)): [psgplay](https://github.com/frno7/psgplay) via `vendor/bin/psgplay` (same engine family as sndh.atari.org); chip-only SNDH stays on `ym2149-wasm`
 
 Install UADE for full UnExoticA coverage:
 

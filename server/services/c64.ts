@@ -32,6 +32,8 @@ export interface C64Record {
   game?: string;
   notes?: string;
   durationSeconds?: number;
+  /** PSID/RSID song count when greater than 1. */
+  subsongCount?: number;
   timestamp?: string;
   sizeBytes: number;
   originalGame: boolean;
@@ -151,6 +153,7 @@ function toTrack(record: C64Record): Track {
     notes: record.notes,
     year: record.year,
     durationSeconds: record.durationSeconds,
+    subsongCount: record.subsongCount,
     timestamp: record.timestamp,
     originalGame: record.originalGame,
     originKind: record.originKind,
@@ -212,6 +215,8 @@ async function indexFile(
         .filter(Boolean)
         .join(' · ') || undefined;
     const durationSeconds = songlengths.get(relativePath);
+    const songs = buf.readUInt16BE(0x0e);
+    const subsongCount = songs > 1 ? songs : undefined;
     const stat = await handle.stat();
 
     return {
@@ -225,6 +230,7 @@ async function indexFile(
       game,
       notes,
       durationSeconds,
+      subsongCount,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
       originalGame: origin.originalGame,

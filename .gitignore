@@ -24,6 +24,10 @@ data/cpc/
 data/c64/
 data/cache/
 
+# Build trees for native helpers (shipped binary lives in vendor/bin/)
+tools/psgplay/
+tools/sc68/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

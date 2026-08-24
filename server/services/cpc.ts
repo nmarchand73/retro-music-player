@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
-import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
+import { parseSndhSubtuneCount, parseSndhTiming } from '../../src/utils/sndhTiming.js';
 import {
   applyCoverYearHeuristic,
   classifyPathOrigin,
@@ -31,6 +31,7 @@ export interface CpcRecord {
   game?: string;
   notes?: string;
   durationSeconds?: number;
+  subsongCount?: number;
   timestamp?: string;
   sizeBytes: number;
   originalGame: boolean;
@@ -212,6 +213,7 @@ function toTrack(record: CpcRecord): Track {
     notes: record.notes,
     year: record.year,
     durationSeconds: record.durationSeconds,
+    subsongCount: record.subsongCount,
     timestamp: record.timestamp,
     originalGame: record.originalGame,
     originKind: record.originKind,
@@ -270,6 +272,7 @@ async function indexFile(root: string, absolutePath: string): Promise<CpcRecord 
     let year: string | undefined;
     let game: string | undefined;
     let durationSeconds: number | undefined;
+    let subsongCount: number | undefined;
     let conv: string | undefined;
 
     if (ay) {
@@ -297,6 +300,10 @@ async function indexFile(root: string, absolutePath: string): Promise<CpcRecord 
       game = isGamePath(relativePath) ? title : undefined;
       const timing = packed ? null : parseSndhTiming(new Uint8Array(headerChunk));
       durationSeconds = timing?.seconds ?? undefined;
+      if (!packed) {
+        const rawSubsongs = parseSndhSubtuneCount(new Uint8Array(headerChunk));
+        if (rawSubsongs > 1) subsongCount = rawSubsongs;
+      }
     }
 
     const origin = classifyPathOrigin({
@@ -326,6 +333,7 @@ async function indexFile(root: string, absolutePath: string): Promise<CpcRecord 
       game,
       notes,
       durationSeconds,
+      subsongCount,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
       originalGame: origin.originalGame,

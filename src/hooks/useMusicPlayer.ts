@@ -13,7 +13,7 @@ import {
 import { SidPlayer } from '../lib/sidPlayer';
 import { TrackerPlayer } from '../lib/trackerPlayer';
 import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
-import { parseSndhTiming } from '../utils/sndhTiming';
+import { parseSndhSubtuneCount, parseSndhTiming } from '../utils/sndhTiming';
 
 const YM_SAMPLE_RATE = 44100;
 
@@ -100,6 +100,9 @@ interface PlayerState {
   trackerPlayback: TrackerPlayback | null;
   analyser: AnalyserNode | null;
   channelMutes: ChipChannelMutes | null;
+  /** 1-based SNDH/YM subsong when the file has more than one. */
+  subsong: number | null;
+  subsongCount: number;
 }
 
 let ymInitPromise: Promise<void> | null = null;
@@ -127,6 +130,8 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
     trackerPlayback: null,
     analyser: null,
     channelMutes: null,
+    subsong: null,
+    subsongCount: 0,
   });
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -134,6 +139,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
   const sidPlayerRef = useRef<SidPlayer | null>(null);
   const ymPlayerRef = useRef<Ym2149Player | null>(null);
   const ymNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const ymBytesRef = useRef<Uint8Array | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioObjectUrlRef = useRef<string | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -220,6 +226,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       ymPlayerRef.current.free();
       ymPlayerRef.current = null;
     }
+    ymBytesRef.current = null;
 
     if (audioElRef.current) {
       audioElRef.current.onended = null;
@@ -245,13 +252,24 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
 
   const playSndh = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext, hint: FxPlatformHint) => {
     await ensureYmInit();
-    const player = new Ym2149Player(new Uint8Array(arrayBuffer));
+    const bytes = new Uint8Array(arrayBuffer);
+    ymBytesRef.current = bytes;
+    const player = new Ym2149Player(bytes);
     ymPlayerRef.current = player;
+
+    const headerCount = parseSndhSubtuneCount(bytes);
+    const wasmCount = player.subsongCount();
+    const count = Math.max(1, headerCount, wasmCount > 0 ? wasmCount : 1);
+    // Subtune 1 = digi samples + YM chip mixed together (Goldrunner, etc.).
+    // Subtune 2 is chip-only when present — switchable in the player UI.
+    const initialSubsong = 1;
+    player.setSubsong(initialSubsong);
+
     player.play();
     ymPausedRef.current = false;
     endedRef.current = false;
 
-    const timing = parseSndhTiming(new Uint8Array(arrayBuffer), player.currentSubsong());
+    const timing = parseSndhTiming(bytes, initialSubsong);
     const wasmRate = player.metadata.frame_rate;
     const rateHz = wasmRate > 0 ? wasmRate : timing.rateHz > 0 ? timing.rateHz : 50;
     const wasmFrames = player.frame_count() || player.metadata.frame_count;
@@ -299,36 +317,36 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
 
       const outputRate = ymOutputRateRef.current || YM_SAMPLE_RATE;
       const position = outputRate > 0 ? ymSamplesOutRef.current / outputRate : 0;
-      const finished = duration != null && position >= duration;
-      const clamped = duration != null ? Math.min(position, duration) : position;
+      const trackDuration = ymDurationRef.current;
+      const finished = trackDuration != null && position >= trackDuration;
+      const clamped = trackDuration != null ? Math.min(position, trackDuration) : position;
 
       if (finished) {
-        if (!endedRef.current) {
-          endedRef.current = true;
-          current.pause();
-          ymPausedRef.current = true;
-          setState((prev) => ({
-            ...prev,
-            position: clamped,
-            duration: duration ?? 0,
-            status: 'idle',
-          }));
-          onEndedRef.current?.();
-        }
+        if (endedRef.current) return;
+        endedRef.current = true;
+        current.pause();
+        ymPausedRef.current = true;
+        setState((prev) => ({
+          ...prev,
+          position: clamped,
+          duration: trackDuration ?? 0,
+          status: 'idle',
+        }));
+        onEndedRef.current?.();
         return;
       }
 
       endedRef.current = false;
 
       if (ymPausedRef.current) {
-        setState((prev) => ({ ...prev, position: clamped, duration: duration ?? 0 }));
+        setState((prev) => ({ ...prev, position: clamped, duration: trackDuration ?? 0 }));
         return;
       }
 
       setState((prev) => ({
         ...prev,
         position: clamped,
-        duration: duration ?? 0,
+        duration: trackDuration ?? 0,
         status: current.is_playing() ? 'playing' : 'idle',
       }));
     }, 200);
@@ -339,10 +357,16 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       duration: duration ?? 0,
       analyser,
       channelMutes: { kind: 'ym', muted: [...OPEN_CHANNELS] },
+      subsong: count > 1 ? initialSubsong : null,
+      subsongCount: count > 1 ? count : 0,
     }));
   }, [connectThroughFx]);
 
-  const playWav = useCallback(async (arrayBuffer: ArrayBuffer, ctx: AudioContext) => {
+  const playWav = useCallback(async (
+    arrayBuffer: ArrayBuffer,
+    ctx: AudioContext,
+    hint: FxPlatformHint = 'amiga',
+  ) => {
     const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
     const objectUrl = URL.createObjectURL(blob);
     audioObjectUrlRef.current = objectUrl;
@@ -353,7 +377,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
 
     const source = ctx.createMediaElementSource(audio);
     mediaSourceRef.current = source;
-    const analyser = connectThroughFx(source, ctx, 'amiga');
+    const analyser = connectThroughFx(source, ctx, hint);
 
     audio.ontimeupdate = () => {
       setState((prev) => ({
@@ -513,6 +537,8 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
         trackerPlayback: null,
         analyser: null,
         channelMutes: null,
+        subsong: null,
+        subsongCount: 0,
       });
 
       try {
@@ -526,6 +552,22 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
         const ctx = audioContextRef.current ?? new AudioContext();
         audioContextRef.current = ctx;
         if (ctx.state === 'suspended') await ctx.resume();
+
+        // Digi SNDH (Goldrunner, …) is rendered server-side with psgplay — same family as
+        // https://sndh.atari.org/ — because ym2149-wasm only plays a short digi burst then silence.
+        if (
+          engine === 'uade' ||
+          engine === 'psgplay' ||
+          contentType.includes('audio/wav') ||
+          contentType.includes('audio/wave')
+        ) {
+          const hint: FxPlatformHint =
+            engine === 'psgplay' || track.platform === 'atari' || track.format.toUpperCase() === 'SNDH'
+              ? 'atari'
+              : 'amiga';
+          await playWav(arrayBuffer, ctx, hint);
+          return;
+        }
 
         if (
           track.format.toUpperCase() === 'SNDH' ||
@@ -547,11 +589,6 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
           engine === 'sid'
         ) {
           await playSid(arrayBuffer, ctx, track);
-          return;
-        }
-
-        if (engine === 'uade' || contentType.includes('audio/wav') || contentType.includes('audio/wave')) {
-          await playWav(arrayBuffer, ctx);
           return;
         }
 
@@ -626,8 +663,56 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       trackerPlayback: null,
       analyser: null,
       channelMutes: null,
+      subsong: null,
+      subsongCount: 0,
     });
   }, [stopAll]);
+
+  const setSubsong = useCallback((index: number) => {
+    const ym = ymPlayerRef.current;
+    const bytes = ymBytesRef.current;
+    if (!ym || !bytes) return false;
+
+    const count = Math.max(1, parseSndhSubtuneCount(bytes), ym.subsongCount() || 1);
+    const next = Math.min(Math.max(Math.round(index), 1), count);
+    if (count <= 1) return false;
+    if (ym.currentSubsong() === next) return true;
+
+    const ok = ym.setSubsong(next);
+    if (!ok) return false;
+
+    const timing = parseSndhTiming(bytes, next);
+    const wasmRate = ym.metadata.frame_rate;
+    const rateHz = wasmRate > 0 ? wasmRate : timing.rateHz > 0 ? timing.rateHz : 50;
+    const wasmFrames = ym.frame_count() || ym.metadata.frame_count;
+    const wasmSeconds = ym.metadata.duration_seconds;
+    const duration =
+      (timing.frames != null && timing.frames > 0 ? timing.frames / rateHz : null) ??
+      timing.seconds ??
+      (wasmFrames > 0 && rateHz > 0 ? wasmFrames / rateHz : null) ??
+      (wasmSeconds > 0 ? wasmSeconds : null);
+
+    ymDurationRef.current = duration;
+    ymRateRef.current = rateHz;
+    ymSamplesOutRef.current = 0;
+    endedRef.current = false;
+    ymPausedRef.current = false;
+    for (let channel = 0; channel < 3; channel += 1) {
+      ym.set_channel_mute(channel, false);
+    }
+    ym.play();
+
+    setState((prev) => ({
+      ...prev,
+      position: 0,
+      duration: duration ?? 0,
+      status: 'playing',
+      subsong: next,
+      subsongCount: count,
+      channelMutes: { kind: 'ym', muted: [...OPEN_CHANNELS] },
+    }));
+    return true;
+  }, []);
 
   const setChannelMute = useCallback((index: 0 | 1 | 2, mute: boolean) => {
     const ym = ymPlayerRef.current;
@@ -736,5 +821,5 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
 
   useEffect(() => () => stopAll(), [stopAll]);
 
-  return { ...state, playTrack, pause, resume, stop, seek, setChannelMute, setOnEnded };
+  return { ...state, playTrack, pause, resume, stop, seek, setChannelMute, setSubsong, setOnEnded };
 }

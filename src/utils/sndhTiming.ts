@@ -63,6 +63,10 @@ function subtuneCount(header: Uint8Array): number {
   return count > 0 ? count : 1;
 }
 
+export function parseSndhSubtuneCount(data: Uint8Array): number {
+  return subtuneCount(headerSlice(data));
+}
+
 function defaultSubsong(header: Uint8Array): number {
   const text = new TextDecoder('latin1').decode(header);
   const match = text.match(/#!(\d{2})/);

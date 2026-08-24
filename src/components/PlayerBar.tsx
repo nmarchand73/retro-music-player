@@ -49,10 +49,75 @@ interface PlayerBarProps {
   analyser: AnalyserNode | null;
   channelMutes: ChipChannelMutes | null;
   onChannelMute: (index: 0 | 1 | 2, mute: boolean) => void;
+  subsong: number | null;
+  subsongCount: number;
+  onSubsong: (index: number) => void;
   audioFx: AudioFxSettings;
   onAudioFxEnabled: (enabled: boolean) => void;
   onAudioFxPreset: (preset: FxPreset) => void;
   onAudioFxAmount: (amount: number) => void;
+}
+
+function subsongLabel(index: number, count: number, track: Track | null): string {
+  if (
+    count === 2 &&
+    track?.platform === 'atari' &&
+    /gold\s*runner/i.test(`${track.title} ${track.game ?? ''}`) &&
+    /hubbard/i.test(track.artist)
+  ) {
+    return index === 1 ? 'Samples + chip' : 'Chip only';
+  }
+  const notes = (track?.notes ?? '').toLowerCase();
+  if (count === 2 && /samples?\s*\/\s*chip|chip only/i.test(notes)) {
+    return index === 1 ? 'Samples + chip' : 'Chip only';
+  }
+  return `Tune ${index}`;
+}
+
+function SubsongControls({
+  subsong,
+  subsongCount,
+  track,
+  onSubsong,
+  compact = false,
+}: {
+  subsong: number;
+  subsongCount: number;
+  track: Track | null;
+  onSubsong: (index: number) => void;
+  compact?: boolean;
+}) {
+  if (subsongCount <= 1) return null;
+  const label = subsongLabel(subsong, subsongCount, track);
+  return (
+    <div
+      className={`player-subsong${compact ? ' is-compact' : ''}`}
+      role="group"
+      aria-label="SNDH subtunes"
+    >
+      <button
+        type="button"
+        className="player-subsong-btn"
+        aria-label="Previous subtune"
+        disabled={subsong <= 1}
+        onClick={() => onSubsong(subsong - 1)}
+      >
+        ‹
+      </button>
+      <span className="player-subsong-label" title={label}>
+        {compact ? `${subsong}/${subsongCount}` : `${label} · ${subsong}/${subsongCount}`}
+      </span>
+      <button
+        type="button"
+        className="player-subsong-btn"
+        aria-label="Next subtune"
+        disabled={subsong >= subsongCount}
+        onClick={() => onSubsong(subsong + 1)}
+      >
+        ›
+      </button>
+    </div>
+  );
 }
 
 function ChannelMuteControls({
@@ -254,6 +319,9 @@ export function PlayerBar({
   analyser,
   channelMutes,
   onChannelMute,
+  subsong,
+  subsongCount,
+  onSubsong,
   audioFx,
   onAudioFxEnabled,
   onAudioFxPreset,
@@ -351,6 +419,15 @@ export function PlayerBar({
 
         <div className="player-controls">
           {fxRail}
+          {subsong != null && subsongCount > 1 ? (
+            <SubsongControls
+              subsong={subsong}
+              subsongCount={subsongCount}
+              track={track}
+              onSubsong={onSubsong}
+              compact
+            />
+          ) : null}
           {channelMutes ? (
             <ChannelMuteControls
               channelMutes={channelMutes}
@@ -461,6 +538,14 @@ export function PlayerBar({
         </div>
         {channelMutes ? (
           <ChannelMuteControls channelMutes={channelMutes} onChannelMute={onChannelMute} />
+        ) : null}
+        {subsong != null && subsongCount > 1 ? (
+          <SubsongControls
+            subsong={subsong}
+            subsongCount={subsongCount}
+            track={track}
+            onSubsong={onSubsong}
+          />
         ) : null}
         {fxRail}
         {seekControls}

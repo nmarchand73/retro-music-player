@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
-import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
+import { parseSndhSubtuneCount, parseSndhTiming } from '../../src/utils/sndhTiming.js';
 import {
   applyCoverYearHeuristic,
   classifyPathOrigin,
@@ -29,6 +29,8 @@ export interface SndhRecord {
   game?: string;
   notes?: string;
   durationSeconds?: number;
+  /** Subtunes in the SNDH header (`##nn`); omitted when 1. */
+  subsongCount?: number;
   timestamp?: string;
   sizeBytes: number;
   originalGame: boolean;
@@ -82,6 +84,7 @@ function toTrack(record: SndhRecord): Track {
     notes: record.notes,
     year: record.year,
     durationSeconds: record.durationSeconds,
+    subsongCount: record.subsongCount,
     timestamp: record.timestamp,
     originalGame: record.originalGame,
     originKind: record.originKind,
@@ -140,6 +143,8 @@ async function indexFile(root: string, absolutePath: string): Promise<SndhRecord
         .join(' · ') || undefined;
     const timing = parseSndhTiming(new Uint8Array(headerChunk));
     const durationSeconds = timing.seconds ?? undefined;
+    const rawSubsongs = parseSndhSubtuneCount(new Uint8Array(headerChunk));
+    const subsongCount = rawSubsongs > 1 ? rawSubsongs : undefined;
     const stat = await handle.stat();
 
     return {
@@ -153,6 +158,7 @@ async function indexFile(root: string, absolutePath: string): Promise<SndhRecord
       game,
       notes,
       durationSeconds,
+      subsongCount,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
       originalGame: origin.originalGame,

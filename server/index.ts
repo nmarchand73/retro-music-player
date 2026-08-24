@@ -40,6 +40,11 @@ import {
   shouldUseUade,
 } from './services/uade.js';
 import {
+  isPsgplayAvailable,
+  renderSndhWithPsgplay,
+  shouldUsePsgplayForSndh,
+} from './services/psgplay.js';
+import {
   findLocalSndhByTitle,
   getSndhTrack,
   loadSndhIndex,
@@ -92,12 +97,13 @@ async function loadLiveTrack(source: string, id: string): Promise<Track | null> 
 }
 
 app.get('/api/health', async (_req, res) => {
-  const [sndh, amiga, cpc, c64, uade] = await Promise.all([
+  const [sndh, amiga, cpc, c64, uade, psgplay] = await Promise.all([
     localSndhStats(),
     localAmigaStats(),
     localCpcStats(),
     localC64Stats(),
     isUadeAvailable(),
+    isPsgplayAvailable(),
   ]);
   res.json({
     app: 'retro-music-player',
@@ -107,6 +113,7 @@ app.get('/api/health', async (_req, res) => {
     cpcLocal: cpc,
     c64Local: c64,
     uade,
+    psgplay,
   });
 });
 
@@ -131,6 +138,7 @@ app.put('/api/prefs', async (req, res) => {
       machines?: unknown;
       audioFx?: unknown;
       bookmarks?: unknown;
+      libraryFilters?: unknown;
     };
     res.json(await writePrefs(patch));
   } catch (err) {
@@ -140,26 +148,29 @@ app.put('/api/prefs', async (req, res) => {
 });
 
 app.get('/api/databases', async (_req, res) => {
-  const [sndh, amiga, cpc, c64, uade] = await Promise.all([
+  const [sndh, amiga, cpc, c64, uade, psgplay] = await Promise.all([
     localSndhStats(),
     localAmigaStats(),
     localCpcStats(),
     localC64Stats(),
     isUadeAvailable(),
+    isPsgplayAvailable(),
   ]);
   const databases: DatabaseInfo[] = [
     {
       id: 'sndh',
       name: 'SNDH Archive',
       description: sndh.connected
-        ? 'Local Atari ST/STe YM2149 dump from sndh.atari.org, searched and played from disk.'
+        ? psgplay
+          ? 'Local Atari ST/STe YM2149 dump — chip via ym2149-wasm, digi/sample SNDH via psgplay (same engine family as sndh.atari.org).'
+          : 'Local Atari ST/STe YM2149 dump from sndh.atari.org. Digi/sample tunes need vendor/bin/psgplay for correct mix.'
         : 'Official Atari ST/STe YM2149 chiptune archive. Download sndh2026_lf.zip into data/sndh to play offline.',
       platform: 'atari',
       url: 'https://sndh.atari.org/',
       connected: sndh.connected,
       requiresKey: false,
       stats: sndh.connected
-        ? `${sndh.count.toLocaleString('en-US')} local SNDH files`
+        ? `${sndh.count.toLocaleString('en-US')} local SNDH files${psgplay ? ' · psgplay on' : ' · psgplay off'}`
         : 'Archive missing',
     },
     {
@@ -443,8 +454,34 @@ app.get('/api/stream/:source/:id', async (req, res) => {
   try {
     if (source === 'sndh') {
       const localPath = await resolveSndhFilePath(id);
+      const forceRaw = String(req.query.raw ?? '') === '1';
+      const subsong = Math.max(1, Number(req.query.subsong) || 1);
+
+      if (localPath && !forceRaw && (await shouldUsePsgplayForSndh(localPath))) {
+        try {
+          const wavPath = await renderSndhWithPsgplay(localPath, subsong);
+          const duration = await wavDurationSeconds(wavPath);
+          res.setHeader('Content-Type', 'audio/wav');
+          res.setHeader('X-Playback-Engine', 'psgplay');
+          res.setHeader('X-Subsong', String(subsong));
+          if (duration) res.setHeader('X-Duration-Seconds', String(Math.round(duration * 10) / 10));
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.sendFile(wavPath);
+          return;
+        } catch (error) {
+          console.warn(
+            '[psgplay]',
+            id,
+            error instanceof Error ? error.message : error,
+          );
+          // Fall through to raw SNDH + browser ym2149-wasm.
+        }
+      }
+
       if (localPath) {
         res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('X-Playback-Engine', 'ym2149-wasm');
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.sendFile(localPath);
         return;
@@ -462,6 +499,7 @@ app.get('/api/stream/:source/:id', async (req, res) => {
         return;
       }
       res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('X-Playback-Engine', 'ym2149-wasm');
       res.setHeader('Access-Control-Allow-Origin', '*');
       const buffer = Buffer.from(await upstream.arrayBuffer());
       res.send(buffer);
@@ -595,12 +633,13 @@ app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-const [sndhIndex, amigaIndex, cpcIndex, c64Index, uade] = await Promise.all([
+const [sndhIndex, amigaIndex, cpcIndex, c64Index, uade, psgplay] = await Promise.all([
   loadSndhIndex(),
   loadAmigaIndex(),
   loadCpcIndex(),
   loadC64Index(),
   isUadeAvailable(),
+  isPsgplayAvailable(),
 ]);
 app.listen(PORT, HOST, () => {
   console.log(`Retro Music Player API on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
@@ -626,4 +665,9 @@ app.listen(PORT, HOST, () => {
       : 'No local HVSC archive — extract HVSC into data/c64/HVSC/C64Music',
   );
   console.log(uade ? 'UADE: available (exotic Amiga formats)' : 'UADE: not found — brew install uade');
+  console.log(
+    psgplay
+      ? 'psgplay: available (digi/sample SNDH, same family as sndh.atari.org)'
+      : 'psgplay: not found — place binary in vendor/bin/psgplay',
+  );
 });

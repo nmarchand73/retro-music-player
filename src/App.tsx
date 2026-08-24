@@ -6,6 +6,7 @@ import { TrackerVisualizer } from './components/TrackerVisualizer';
 import { TrackList, type LibraryView } from './components/TrackList';
 import { useMachineSettings } from './hooks/useMachineSettings';
 import { useAudioFxSettings } from './hooks/useAudioFxSettings';
+import { useLibraryFilters } from './hooks/useLibraryFilters';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useFxPreviewTracks } from './hooks/useFxPreviewTracks';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
@@ -22,8 +23,6 @@ function App() {
   const [platform, setPlatform] = useState<MusicPlatform>('all');
   const [field, setField] = useState<SearchField>('any');
   const [sort, setSort] = useState<SortKey>('match');
-  const [playableOnly, setPlayableOnly] = useState(true);
-  const [originalOnly, setOriginalOnly] = useState(true);
   const [uadeAvailable, setUadeAvailable] = useState(false);
   const [view, setView] = useState<LibraryView>('library');
   const [playerMinimized, setPlayerMinimized] = useState(true);
@@ -32,6 +31,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [dbLoading, setDbLoading] = useState(true);
   const { machines, toggleMachine, enableAll } = useMachineSettings();
+  const { originalOnly, playableOnly, setOriginalOnly, setPlayableOnly } = useLibraryFilters();
   const { audioFx, setEnabled: setAudioFxEnabled, setPreset: setAudioFxPreset, setAmount: setAudioFxAmount } =
     useAudioFxSettings();
   const { tracks: fxPreviewTracks, loading: fxPreviewLoading } = useFxPreviewTracks();
@@ -40,9 +40,6 @@ function App() {
 
   const player = useMusicPlayer(audioFx);
   const { bookmarks, isBookmarked, toggleBookmark, patchBookmark } = useBookmarks();
-  const tracksRef = useRef(tracks);
-  const currentRef = useRef(player.currentTrack);
-  const playRef = useRef(player.playTrack);
   const reportedDurationRef = useRef<string | null>(null);
   const visibleTracks = useMemo(() => {
     const source = view === 'bookmarks' ? bookmarks : tracks;
@@ -54,9 +51,6 @@ function App() {
       return true;
     });
   }, [bookmarks, originalOnly, playableOnly, query, sort, tracks, uadeAvailable, view]);
-  tracksRef.current = visibleTracks;
-  currentRef.current = player.currentTrack;
-  playRef.current = player.playTrack;
 
   const runSearch = useCallback(
     async (
@@ -166,23 +160,10 @@ function App() {
   const pause = player.pause;
   const resume = player.resume;
   const seek = player.seek;
-  const setOnEnded = player.setOnEnded;
 
   const playAdjacent = useCallback((track: Track | undefined) => {
     if (track) playTrack(track);
   }, [playTrack]);
-
-  useEffect(() => {
-    setOnEnded(() => {
-      const list = tracksRef.current;
-      const current = currentRef.current;
-      if (!current) return;
-      const index = list.findIndex((track) => trackKey(track) === trackKey(current));
-      const following = index >= 0 ? list[index + 1] : undefined;
-      if (following) playRef.current(following);
-    });
-    return () => setOnEnded(null);
-  }, [setOnEnded]);
 
   const handleFacetSearch = useCallback((search: LibrarySearch) => {
     setView('library');
@@ -191,7 +172,7 @@ function App() {
     if (search.platform !== undefined) setPlatform(search.platform);
     // Amiga UnExoticA often uses custom formats; show them when browsing by game.
     if (search.field === 'game') setPlayableOnly(false);
-  }, []);
+  }, [setPlayableOnly]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -409,6 +390,9 @@ function App() {
           analyser={player.analyser}
           channelMutes={player.channelMutes}
           onChannelMute={player.setChannelMute}
+          subsong={player.subsong}
+          subsongCount={player.subsongCount}
+          onSubsong={player.setSubsong}
           audioFx={audioFx}
           onAudioFxEnabled={setAudioFxEnabled}
           onAudioFxPreset={setAudioFxPreset}

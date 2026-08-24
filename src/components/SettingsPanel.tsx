@@ -34,6 +34,10 @@ interface SettingsPanelProps {
   machines: MachineSettings;
   onToggle: (id: MachineId) => void;
   onEnableAll: () => void;
+  originalOnly: boolean;
+  onOriginalOnly: (originalOnly: boolean) => void;
+  playableOnly: boolean;
+  onPlayableOnly: (playableOnly: boolean) => void;
   audioFx: AudioFxSettings;
   onAudioFxEnabled: (enabled: boolean) => void;
   onAudioFxPreset: (preset: FxPreset) => void;
@@ -50,6 +54,10 @@ export function SettingsPanel({
   machines,
   onToggle,
   onEnableAll,
+  originalOnly,
+  onOriginalOnly,
+  playableOnly,
+  onPlayableOnly,
   audioFx,
   onAudioFxEnabled,
   onAudioFxPreset,
@@ -71,14 +79,49 @@ export function SettingsPanel({
         <div>
           <h2>Settings</h2>
           <p className="muted">
-            Default machines for Library search, Insights, and “All platforms”, plus optional Modern
-            sound FX after SID / AY / Amiga playback.
+            Library filters, default machines for search and Insights, plus optional Modern sound FX
+            after SID / AY / Amiga playback.
           </p>
         </div>
         <button type="button" className="settings-reset" onClick={onEnableAll} disabled={active.length === MACHINE_IDS.length}>
           Enable all
         </button>
       </header>
+
+      <section className="settings-library-filters" aria-labelledby="settings-library-heading">
+        <h3 className="settings-section-heading" id="settings-library-heading">
+          Library filters
+        </h3>
+        <p className="muted">
+          Applied to Library search results and Bookmarks. Defaults keep pure game soundtracks only.
+        </p>
+        <label className={`settings-machine-row${originalOnly ? ' is-on' : ''}`}>
+          <input
+            type="checkbox"
+            checked={originalOnly}
+            aria-label="Game music only"
+            onChange={(event) => onOriginalOnly(event.target.checked)}
+          />
+          <span className="settings-machine-copy">
+            <strong>Game music only</strong>
+            <span className="muted">
+              Hide demos, remixes, Quartet conversions, and later covers (e.g. Tyan Goldrunner).
+            </span>
+          </span>
+        </label>
+        <label className={`settings-machine-row${playableOnly ? ' is-on' : ''}`}>
+          <input
+            type="checkbox"
+            checked={playableOnly}
+            aria-label="Playable only"
+            onChange={(event) => onPlayableOnly(event.target.checked)}
+          />
+          <span className="settings-machine-copy">
+            <strong>Playable only</strong>
+            <span className="muted">Hide Amiga formats the current engines cannot decode.</span>
+          </span>
+        </label>
+      </section>
 
       <section className="settings-audio-fx" aria-labelledby="settings-audio-fx-heading">
         <h3 id="settings-audio-fx-heading">Listening</h3>

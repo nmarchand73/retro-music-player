@@ -6,6 +6,7 @@ export type StoredPrefs = {
   machines?: unknown;
   audioFx?: unknown;
   bookmarks?: unknown;
+  libraryFilters?: unknown;
 };
 
 function prefsFilePath(): string {
@@ -46,6 +47,7 @@ export async function writePrefs(patch: StoredPrefs): Promise<StoredPrefs> {
   if ('machines' in patch) next.machines = patch.machines;
   if ('audioFx' in patch) next.audioFx = patch.audioFx;
   if ('bookmarks' in patch) next.bookmarks = patch.bookmarks;
+  if ('libraryFilters' in patch) next.libraryFilters = patch.libraryFilters;
   await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   return next;
 }

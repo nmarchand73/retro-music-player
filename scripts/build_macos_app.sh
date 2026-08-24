@@ -88,6 +88,8 @@ rsync -a --delete \
   --exclude 'data/cpc/' \
   --exclude 'data/c64/' \
   --exclude 'data/cache/' \
+  --exclude 'tools/psgplay/' \
+  --exclude 'tools/sc68/' \
   --exclude '__pycache__/' \
   --exclude '*.pyc' \
   --exclude '.DS_Store' \

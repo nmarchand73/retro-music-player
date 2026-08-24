@@ -404,6 +404,7 @@ export function TrackList({
       <button
         type="button"
         role="tab"
+        className="view-tab-settings"
         aria-selected={view === 'settings'}
         onClick={() => onView('settings')}
       >
@@ -475,6 +476,10 @@ export function TrackList({
           machines={machines}
           onToggle={onToggleMachine}
           onEnableAll={onEnableAllMachines}
+          originalOnly={originalOnly}
+          onOriginalOnly={onOriginalOnly}
+          playableOnly={playableOnly}
+          onPlayableOnly={onPlayableOnly}
           audioFx={audioFx}
           onAudioFxEnabled={onAudioFxEnabled}
           onAudioFxPreset={onAudioFxPreset}
@@ -636,6 +641,14 @@ export function TrackList({
                       {playerStatus === 'loading' ? 'Loading' : playing ? 'Playing' : 'Paused'}
                     </span>
                   )}
+                  {track.subsongCount != null && track.subsongCount > 1 ? (
+                    <span
+                      className="chip subtunes"
+                      title={`${track.subsongCount} songs in this file — switch with ‹ › in the player`}
+                    >
+                      {track.subsongCount} songs
+                    </span>
+                  ) : null}
                   <span className="chip">{track.format}</span>
                 </span>
                 <BookmarkButton

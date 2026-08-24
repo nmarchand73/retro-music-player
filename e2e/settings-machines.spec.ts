@@ -12,6 +12,8 @@ test.describe('Machine settings defaults', () => {
 
     await page.getByRole('tab', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Library filters' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Game music only' }).first()).toBeChecked();
 
     const c64 = page.getByRole('checkbox', { name: /Commodore 64/i });
     await expect(c64).toBeChecked();

@@ -271,6 +271,21 @@ test.describe('Local SNDH library golden path', () => {
     });
   });
 
+  test('list shows song count for multi-subtune SNDH like Xenon', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByRole('combobox', { name: 'Platform' }).selectOption('atari');
+    await page.getByRole('searchbox', { name: 'Search music' }).fill('Xenon Whittaker');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+    const xenon = page
+      .locator('.track-list li')
+      .filter({ has: page.getByRole('button', { name: /^Search title Xenon$/i }) })
+      .filter({ has: page.getByRole('button', { name: /Search author David Whittaker/i }) });
+    await expect(xenon.first()).toBeVisible();
+    await expect(xenon.first().locator('.chip.subtunes')).toHaveText('3 songs');
+  });
+
   test('show the UnExoticA box scan on the Atari version of the same game', async ({ page }) => {
     await page.goto('/');
 

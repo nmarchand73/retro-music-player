@@ -27,6 +27,8 @@ export interface Track {
   year?: string;
   timestamp?: string;
   durationSeconds?: number;
+  /** Number of subtunes/songs in the file when greater than 1 (SNDH ##nn, SID songs, …). */
+  subsongCount?: number;
   /** False for demos, remixes, conversions, and covers — hidden when “Game music only” is on. */
   originalGame?: boolean;
   originKind?: TrackOriginKind;
