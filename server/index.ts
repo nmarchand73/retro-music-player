@@ -1,5 +1,5 @@
 import cors from 'cors';
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import path from 'node:path';
 import { searchLocalCatalog, getLocalTrack } from './data/localCatalog.js';
 import { DATA_ROOT, PROJECT_ROOT } from './paths.js';
@@ -449,8 +449,22 @@ app.get('/api/cover/:source/:id', async (req, res) => {
   }
 });
 
+function sanitizeDownloadFilename(name: string): string {
+  return name.replace(/[^\w\s.\-()+]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 180) || 'track.bin';
+}
+
+function applyDownloadAttachment(req: Request, res: Response): void {
+  if (String(req.query.download ?? '') !== '1') return;
+  const filename =
+    typeof req.query.filename === 'string'
+      ? sanitizeDownloadFilename(req.query.filename)
+      : 'track.bin';
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+}
+
 app.get('/api/stream/:source/:id', async (req, res) => {
   const { source, id } = req.params;
+  applyDownloadAttachment(req, res);
 
   try {
     if (source === 'sndh') {

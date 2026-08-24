@@ -18,6 +18,7 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -344,6 +345,63 @@ def main() -> int:
 
     _log(f"[retro-music] Serving http://{host}:{port}")
     url = f"http://{host}:{port}/"
+
+    class DesktopApi:
+        def __init__(self, base_url: str) -> None:
+            self._base = base_url.rstrip("/")
+
+        def download_file(self, url_path: str, filename: str) -> dict:
+            if sys.platform != "darwin":
+                return {"ok": False, "error": "Save dialog is only available on macOS"}
+
+            result: dict = {"ok": False, "error": "Save dialog timed out"}
+            done = threading.Event()
+
+            def on_main() -> None:
+                nonlocal result
+                try:
+                    result = self._download_file_on_main(url_path, filename)
+                except Exception as exc:
+                    result = {"ok": False, "error": str(exc)}
+                finally:
+                    done.set()
+
+            from Foundation import NSOperationQueue
+
+            NSOperationQueue.mainQueue().addOperationWithBlock_(on_main)
+            if not done.wait(timeout=300):
+                return {"ok": False, "error": "Save dialog timed out"}
+            return result
+
+        def _download_file_on_main(self, url_path: str, filename: str) -> dict:
+            from AppKit import NSSavePanel
+            import urllib.request
+
+            safe_name = (filename or "track.bin").strip() or "track.bin"
+            panel = NSSavePanel.savePanel()
+            panel.setCanCreateDirectories_(True)
+            panel.setNameFieldStringValue_(safe_name)
+            panel.setTitle_("Save track")
+            panel.setPrompt_("Save")
+
+            if panel.runModal() != 1:
+                return {"ok": False, "cancelled": True}
+
+            dest_url = panel.URL()
+            if dest_url is None:
+                return {"ok": False, "cancelled": True}
+            dest_path = dest_url.path()
+            if not dest_path:
+                return {"ok": False, "cancelled": True}
+
+            path = url_path if url_path.startswith("/") else f"/{url_path}"
+            full_url = f"{self._base}{path}"
+            try:
+                urllib.request.urlretrieve(full_url, dest_path)
+            except Exception as exc:
+                return {"ok": False, "error": str(exc)}
+            return {"ok": True}
+
     webview.create_window(
         title="Retro Music Player",
         url=url,
@@ -351,6 +409,7 @@ def main() -> int:
         height=920,
         min_size=(960, 680),
         background_color="#121018",
+        js_api=DesktopApi(url),
     )
     try:
         webview.start(private_mode=False, storage_path=str(WEBVIEW_DIR))

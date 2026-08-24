@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { BookmarkButton } from './BookmarkButton';
+import { DownloadButton } from './DownloadButton';
 import { MarqueeText } from './MarqueeText';
 import { MiniSpectrum } from './MiniSpectrum';
 import { PianoRoll } from './PianoRoll';
@@ -513,6 +514,7 @@ export function PlayerBar({
               <>
                 <div className="player-title">
                   <MarqueeText text={track.title} className="player-title-label" />
+                  <DownloadButton track={track} />
                   <BookmarkButton title={track.title} bookmarked={bookmarked} onToggle={onToggleBookmark} />
                 </div>
                 {titleDuration && <span className="player-title-duration">{titleDuration}</span>}

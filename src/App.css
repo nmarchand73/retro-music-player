@@ -764,6 +764,35 @@ select:focus-visible,
   background: var(--accent-pale);
 }
 
+.download-toggle {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.download-toggle:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--accent-pale);
+}
+
+.download-toggle:disabled,
+.download-toggle.is-busy {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.download-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
 .bookmark-icon {
   width: 0.95rem;
   height: 0.95rem;
@@ -775,6 +804,19 @@ select:focus-visible,
   border: 0;
   background: transparent;
   color: var(--ink-muted);
+}
+
+.player-title .download-toggle {
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.player-title .download-toggle:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent);
 }
 
 .player-title .bookmark-toggle.on,
@@ -1397,7 +1439,9 @@ select:focus-visible,
 }
 
 .player-hud-meta .player-title .bookmark-toggle,
-.player-title .bookmark-toggle {
+.player-title .bookmark-toggle,
+.player-hud-meta .player-title .download-toggle,
+.player-title .download-toggle {
   flex-shrink: 0;
 }
 

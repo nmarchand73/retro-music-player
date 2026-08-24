@@ -126,6 +126,15 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('button', { name: 'Collapse player' })).toBeVisible();
     await expect(player.getByRole('button', { name: 'Next track' })).toBeVisible();
 
+    const downloadReq = page.waitForRequest(
+      (req) =>
+        req.url().includes('/api/stream/sndh/') &&
+        req.url().includes('raw=1') &&
+        req.url().includes('download=1'),
+    );
+    await player.getByRole('button', { name: 'Download Last Ninja' }).click();
+    await downloadReq;
+
     const ayChannels = player.getByRole('group', { name: 'AY channels' });
     await expect(ayChannels).toBeVisible();
     await expect(ayChannels.getByRole('button', { name: 'Mute AY channel A' })).toHaveAttribute(
