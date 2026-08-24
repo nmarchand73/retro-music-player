@@ -271,6 +271,7 @@ app.get('/api/search', async (req, res) => {
   const platform = (isMusicPlatform(platformRaw) ? platformRaw : 'all') as MusicPlatform;
   const field = (String(req.query.field ?? 'any') as SearchField) || 'any';
   const playableOnly = String(req.query.playable ?? '1') !== '0';
+  const originalOnly = String(req.query.original ?? '1') !== '0';
   const machines = resolveSearchMachines(platform, String(req.query.machines ?? ''));
 
   try {
@@ -295,6 +296,7 @@ app.get('/api/search', async (req, res) => {
 
     const unique = new Map<string, (typeof tracks)[number]>();
     for (const track of tracks) {
+      if (originalOnly && track.originalGame === false) continue;
       unique.set(`${track.source}:${track.id}`, track);
     }
     const covered = await attachGameCovers(Array.from(unique.values()));

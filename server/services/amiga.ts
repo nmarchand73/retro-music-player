@@ -5,6 +5,11 @@ import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens
 import type { SearchField, Track } from '../types.js';
 import { isAmigaFormatPlayable } from '../../src/utils/amigaPlayable.js';
 import {
+  classifyPathOrigin,
+  ORIGIN_KIND_LABELS,
+  type TrackOriginKind,
+} from '../../src/utils/trackOrigin.js';
+import {
   estimateModDurationSeconds,
   getCachedAmigaDuration,
   rememberAmigaDuration,
@@ -195,6 +200,8 @@ export interface AmigaRecord {
   durationSeconds?: number;
   timestamp?: string;
   coverPath?: string;
+  originalGame: boolean;
+  originKind: TrackOriginKind;
 }
 
 let records: AmigaRecord[] | null = null;
@@ -324,6 +331,8 @@ function toTrack(record: AmigaRecord): Track {
     game: record.game,
     notes: record.notes,
     timestamp: record.timestamp,
+    originalGame: record.originalGame,
+    originKind: record.originKind,
     streamUrl: `/api/stream/amiga/${record.id}`,
     coverUrl: record.coverPath ? `/api/cover/amiga/${record.id}` : undefined,
     detailUrl: UNEXOTICA_URL,
@@ -426,6 +435,19 @@ async function indexFile(root: string, absolutePath: string): Promise<AmigaRecor
       ? await readModDurationHint(absolutePath)
       : undefined);
 
+  const origin = classifyPathOrigin({
+    relativePath,
+    title: meta.title,
+    filename: path.basename(absolutePath),
+  });
+  const notes =
+    [
+      meta.notes,
+      origin.originalGame ? undefined : ORIGIN_KIND_LABELS[origin.originKind],
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined;
+
   return {
     id,
     relativePath,
@@ -435,11 +457,13 @@ async function indexFile(root: string, absolutePath: string): Promise<AmigaRecor
     folderArtist: meta.folderArtist,
     format: parsed.format,
     game: meta.game,
-    notes: meta.notes,
+    notes,
     sizeBytes: stat.size,
     durationSeconds: estimated,
     timestamp: stat.mtime.toISOString(),
     coverPath,
+    originalGame: origin.originalGame,
+    originKind: origin.originKind,
   };
 }
 

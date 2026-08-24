@@ -3,6 +3,12 @@ import path from 'node:path';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
+import {
+  applyCoverYearHeuristic,
+  classifyPathOrigin,
+  ORIGIN_KIND_LABELS,
+  type TrackOriginKind,
+} from '../../src/utils/trackOrigin.js';
 import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const HEADER_BYTES = 4096;
@@ -27,6 +33,8 @@ export interface CpcRecord {
   durationSeconds?: number;
   timestamp?: string;
   sizeBytes: number;
+  originalGame: boolean;
+  originKind: TrackOriginKind;
 }
 
 let indexPromise: Promise<CpcRecord[]> | null = null;
@@ -205,6 +213,8 @@ function toTrack(record: CpcRecord): Track {
     year: record.year,
     durationSeconds: record.durationSeconds,
     timestamp: record.timestamp,
+    originalGame: record.originalGame,
+    originKind: record.originKind,
     streamUrl: `/api/stream/cpc/${record.id}`,
     detailUrl:
       record.format === 'AY'
@@ -260,6 +270,7 @@ async function indexFile(root: string, absolutePath: string): Promise<CpcRecord 
     let year: string | undefined;
     let game: string | undefined;
     let durationSeconds: number | undefined;
+    let conv: string | undefined;
 
     if (ay) {
       const meta = parseAyMeta(headerChunk, pathTitle);
@@ -282,14 +293,22 @@ async function indexFile(root: string, absolutePath: string): Promise<CpcRecord 
       title = packed ? pathTitle : (readTag(header, 'TITL') ?? pathTitle);
       artist = packed ? folderArtist : (readTag(header, 'COMM') ?? folderArtist);
       year = packed ? undefined : readTag(header, 'YEAR');
+      conv = packed ? undefined : readTag(header, 'CONV');
       game = isGamePath(relativePath) ? title : undefined;
       const timing = packed ? null : parseSndhTiming(new Uint8Array(headerChunk));
       durationSeconds = timing?.seconds ?? undefined;
     }
 
+    const origin = classifyPathOrigin({
+      relativePath,
+      title,
+      filename: path.basename(absolutePath),
+      conv,
+    });
     const notes = [
       game ? 'Game soundtrack' : undefined,
       collectionNote(relativePath, format),
+      origin.originalGame ? undefined : ORIGIN_KIND_LABELS[origin.originKind],
     ]
       .filter(Boolean)
       .join(' · ') || undefined;
@@ -309,6 +328,8 @@ async function indexFile(root: string, absolutePath: string): Promise<CpcRecord 
       durationSeconds,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
+      originalGame: origin.originalGame,
+      originKind: origin.originKind,
     };
   } finally {
     await handle.close();
@@ -336,6 +357,13 @@ async function buildIndex(): Promise<CpcRecord[]> {
   }
 
   records.sort((a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title));
+  applyCoverYearHeuristic(records);
+  for (const record of records) {
+    if (record.originalGame || !record.originKind || record.originKind === 'game') continue;
+    const label = ORIGIN_KIND_LABELS[record.originKind];
+    if (record.notes?.includes(label)) continue;
+    record.notes = [record.notes, label].filter(Boolean).join(' · ') || label;
+  }
   const sndhCount = records.filter((record) => record.format === 'SNDH').length;
   const ymCount = records.filter((record) => record.format === 'YM').length;
   const ayCount = records.filter((record) => record.format === 'AY').length;

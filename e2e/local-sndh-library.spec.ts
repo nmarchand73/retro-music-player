@@ -252,6 +252,25 @@ test.describe('Local SNDH library golden path', () => {
     await expect(page.getByRole('region', { name: 'Tracker pattern' })).toHaveCount(0);
   });
 
+  test('hide Goldrunner demo covers until Game music only is unchecked', async ({ page }) => {
+    await page.goto('/');
+
+    await expect(page.getByRole('checkbox', { name: 'Game music only' })).toBeChecked();
+    await page.getByRole('combobox', { name: 'Platform' }).selectOption('atari');
+    await page.getByRole('searchbox', { name: 'Search music' }).fill('goldrunner');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: /Play Gold ?Runner/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Search author Rob Hubbard/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Search author Tyan/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Search author Simon O/i })).toHaveCount(0);
+
+    await page.getByRole('checkbox', { name: 'Game music only' }).uncheck();
+    await expect(page.getByRole('button', { name: /Search author Tyan/i }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   test('show the UnExoticA box scan on the Atari version of the same game', async ({ page }) => {
     await page.goto('/');
 

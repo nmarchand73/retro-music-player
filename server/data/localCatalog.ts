@@ -1,8 +1,23 @@
 import { matchesAllTokens, searchTokens } from '../searchQuery.js';
-import type { SearchField, Track } from './types.js';
+import type { SearchField, Track } from '../types.js';
+import { classifyPathOrigin } from '../../src/utils/trackOrigin.js';
+
+function withOrigin(
+  track: Omit<Track, 'originalGame' | 'originKind'> & Partial<Pick<Track, 'originalGame' | 'originKind'>>,
+): Track {
+  const origin =
+    track.originalGame != null && track.originKind
+      ? { originalGame: track.originalGame, originKind: track.originKind }
+      : classifyPathOrigin({
+          relativePath: track.id,
+          title: track.title,
+          genre: track.genre,
+        });
+  return { ...track, ...origin };
+}
 
 export const localCatalog: Track[] = [
-  {
+  withOrigin({
     id: 'demo-atari-1',
     source: 'local',
     platform: 'atari',
@@ -14,8 +29,8 @@ export const localCatalog: Track[] = [
     year: '2013',
     streamUrl: '/api/stream/local/demo-atari-1',
     detailUrl: 'https://sndh.atari.org/',
-  },
-  {
+  }),
+  withOrigin({
     id: 'demo-atari-2',
     source: 'local',
     platform: 'atari',
@@ -28,7 +43,7 @@ export const localCatalog: Track[] = [
     notes: 'From the game of the same name. Atari ST game soundtrack.',
     streamUrl: '/api/stream/local/demo-atari-2',
     detailUrl: 'https://sndh.atari.org/',
-  },
+  }),
 ];
 
 function trackHaystack(track: Track, field: SearchField): string {

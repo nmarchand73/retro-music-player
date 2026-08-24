@@ -4,6 +4,12 @@ import path from 'node:path';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
 import { parseSndhTiming } from '../../src/utils/sndhTiming.js';
+import {
+  applyCoverYearHeuristic,
+  classifyPathOrigin,
+  ORIGIN_KIND_LABELS,
+  type TrackOriginKind,
+} from '../../src/utils/trackOrigin.js';
 import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const SNDH_BASE = 'https://sndh.atari.org';
@@ -25,6 +31,8 @@ export interface SndhRecord {
   durationSeconds?: number;
   timestamp?: string;
   sizeBytes: number;
+  originalGame: boolean;
+  originKind: TrackOriginKind;
 }
 
 let indexPromise: Promise<SndhRecord[]> | null = null;
@@ -75,6 +83,8 @@ function toTrack(record: SndhRecord): Track {
     year: record.year,
     durationSeconds: record.durationSeconds,
     timestamp: record.timestamp,
+    originalGame: record.originalGame,
+    originKind: record.originKind,
     streamUrl: `/api/stream/sndh/${record.id}`,
     detailUrl: `${SNDH_BASE}/`,
   };
@@ -112,8 +122,22 @@ async function indexFile(root: string, absolutePath: string): Promise<SndhRecord
     const title = readTag(header, 'TITL') ?? path.parse(absolutePath).name.replaceAll('_', ' ');
     const artist = readTag(header, 'COMM') ?? folderArtist;
     const year = readTag(header, 'YEAR');
+    const conv = readTag(header, 'CONV');
     const game = isGamePath(relativePath) ? title : undefined;
-    const notes = [year, game ? 'Game soundtrack' : undefined].filter(Boolean).join(' · ') || undefined;
+    const origin = classifyPathOrigin({
+      relativePath,
+      title,
+      filename: path.basename(absolutePath),
+      conv,
+    });
+    const notes =
+      [
+        year,
+        game ? 'Game soundtrack' : undefined,
+        origin.originalGame ? undefined : ORIGIN_KIND_LABELS[origin.originKind],
+      ]
+        .filter(Boolean)
+        .join(' · ') || undefined;
     const timing = parseSndhTiming(new Uint8Array(headerChunk));
     const durationSeconds = timing.seconds ?? undefined;
     const stat = await handle.stat();
@@ -131,6 +155,8 @@ async function indexFile(root: string, absolutePath: string): Promise<SndhRecord
       durationSeconds,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
+      originalGame: origin.originalGame,
+      originKind: origin.originKind,
     };
   } finally {
     await handle.close();
@@ -158,6 +184,13 @@ async function buildIndex(): Promise<SndhRecord[]> {
   }
 
   records.sort((a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title));
+  applyCoverYearHeuristic(records);
+  for (const record of records) {
+    if (record.originalGame || !record.originKind || record.originKind === 'game') continue;
+    const label = ORIGIN_KIND_LABELS[record.originKind];
+    if (record.notes?.includes(label)) continue;
+    record.notes = [record.notes, label].filter(Boolean).join(' · ') || label;
+  }
   return records;
 }
 
@@ -337,6 +370,19 @@ function parseRow($: cheerio.CheerioAPI, row: cheerio.Element, artistOverride?: 
   const artist = artistOverride ?? (artistLink.text().trim() || 'Unknown');
   const notes = cells.last().text().trim();
 
+  const game = extractGameLabel(title, notes);
+  const looksLikeGame = Boolean(game) || isGameTrack({
+    id,
+    source: 'sndh',
+    platform: 'atari',
+    title,
+    artist,
+    format: 'SNDH',
+    notes,
+    game,
+    streamUrl: '',
+  });
+
   return {
     id,
     source: 'sndh',
@@ -345,7 +391,9 @@ function parseRow($: cheerio.CheerioAPI, row: cheerio.Element, artistOverride?: 
     artist,
     format: 'SNDH',
     notes: notes && notes !== title && notes !== artist ? notes : undefined,
-    game: extractGameLabel(title, notes),
+    game,
+    originalGame: looksLikeGame,
+    originKind: looksLikeGame ? 'game' : 'cover',
     streamUrl: `/api/stream/sndh/${id}`,
     detailUrl: `${SNDH_BASE}/?ID=${id}`,
   };

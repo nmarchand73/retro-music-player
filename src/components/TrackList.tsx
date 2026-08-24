@@ -14,6 +14,7 @@ import {
 import { formatTitleDuration } from '../utils/formatTime';
 import { SORT_LABELS, type SortKey } from '../utils/sortTracks';
 import { trackKey } from '../utils/trackKey';
+import { ORIGIN_KIND_LABELS } from '../utils/trackOrigin';
 import { BookmarkButton } from './BookmarkButton';
 import { InsightsPanel } from './InsightsPanel';
 import { SettingsPanel } from './SettingsPanel';
@@ -36,6 +37,8 @@ interface TrackListProps {
   onSort: (sort: SortKey) => void;
   playableOnly: boolean;
   onPlayableOnly: (playableOnly: boolean) => void;
+  originalOnly: boolean;
+  onOriginalOnly: (originalOnly: boolean) => void;
   view: LibraryView;
   bookmarkCount: number;
   onView: (view: LibraryView) => void;
@@ -333,6 +336,8 @@ export function TrackList({
   onSort,
   playableOnly,
   onPlayableOnly,
+  originalOnly,
+  onOriginalOnly,
   view,
   bookmarkCount,
   onView,
@@ -417,6 +422,15 @@ export function TrackList({
           onChange={(event) => onPlayableOnly(event.target.checked)}
         />
         Playable only
+      </label>
+      <label className="playable-filter">
+        <input
+          type="checkbox"
+          checked={originalOnly}
+          aria-label="Game music only"
+          onChange={(event) => onOriginalOnly(event.target.checked)}
+        />
+        Game music only
       </label>
       <label className="search-select sort-select">
         <span>Sort</span>
@@ -594,6 +608,12 @@ export function TrackList({
                       onSearch={() => onSearch({ query: track.artist, field: 'author' })}
                     />
                     {track.year ? <span className="track-year"> · {track.year}</span> : null}
+                    {track.originalGame === false && track.originKind ? (
+                      <span className="track-origin" data-origin={track.originKind}>
+                        {' '}
+                        · {ORIGIN_KIND_LABELS[track.originKind]}
+                      </span>
+                    ) : null}
                     {track.game ? (
                       <>
                         <span className="track-sep"> · </span>

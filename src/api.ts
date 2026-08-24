@@ -15,12 +15,14 @@ export async function searchTracks(
   field: SearchField,
   playableOnly = true,
   machines?: string,
+  originalOnly = true,
 ): Promise<SearchResponse> {
   const params = new URLSearchParams({
     q: query,
     platform,
     field,
     playable: playableOnly ? '1' : '0',
+    original: originalOnly ? '1' : '0',
   });
   if (machines) params.set('machines', machines);
   const response = await fetch(`${API_BASE}/search?${params}`);

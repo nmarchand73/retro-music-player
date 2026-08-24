@@ -23,6 +23,7 @@ function App() {
   const [field, setField] = useState<SearchField>('any');
   const [sort, setSort] = useState<SortKey>('match');
   const [playableOnly, setPlayableOnly] = useState(true);
+  const [originalOnly, setOriginalOnly] = useState(true);
   const [uadeAvailable, setUadeAvailable] = useState(false);
   const [view, setView] = useState<LibraryView>('library');
   const [playerMinimized, setPlayerMinimized] = useState(true);
@@ -47,8 +48,12 @@ function App() {
     const source = view === 'bookmarks' ? bookmarks : tracks;
     const sorted =
       view === 'bookmarks' && sort === 'match' ? source : sortTracks(source, sort, query);
-    return playableOnly ? sorted.filter((track) => isTrackPlayable(track, uadeAvailable)) : sorted;
-  }, [bookmarks, playableOnly, query, sort, tracks, uadeAvailable, view]);
+    return sorted.filter((track) => {
+      if (playableOnly && !isTrackPlayable(track, uadeAvailable)) return false;
+      if (originalOnly && track.originalGame === false) return false;
+      return true;
+    });
+  }, [bookmarks, originalOnly, playableOnly, query, sort, tracks, uadeAvailable, view]);
   tracksRef.current = visibleTracks;
   currentRef.current = player.currentTrack;
   playRef.current = player.playTrack;
@@ -60,6 +65,7 @@ function App() {
       searchField: SearchField,
       searchPlayableOnly: boolean,
       searchMachines: string,
+      searchOriginalOnly: boolean,
     ) => {
       setLoading(true);
       try {
@@ -69,6 +75,7 @@ function App() {
           searchField,
           searchPlayableOnly,
           searchMachines,
+          searchOriginalOnly,
         );
         setTracks(result.tracks);
       } catch {
@@ -103,10 +110,10 @@ function App() {
   useEffect(() => {
     const delay = query.trim() ? 280 : 0;
     const timer = window.setTimeout(() => {
-      void runSearch(query, platform, field, playableOnly, machinesParam);
+      void runSearch(query, platform, field, playableOnly, machinesParam, originalOnly);
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [query, platform, field, playableOnly, machinesParam, runSearch]);
+  }, [query, platform, field, playableOnly, originalOnly, machinesParam, runSearch]);
 
   const currentTrackId = player.currentTrack ? trackKey(player.currentTrack) : null;
 
@@ -188,7 +195,7 @@ function App() {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    void runSearch(query, platform, field, playableOnly, machinesParam);
+    void runSearch(query, platform, field, playableOnly, machinesParam, originalOnly);
   };
 
   const handleActivate = useCallback(
@@ -333,6 +340,8 @@ function App() {
           onSort={setSort}
           playableOnly={playableOnly}
           onPlayableOnly={setPlayableOnly}
+          originalOnly={originalOnly}
+          onOriginalOnly={setOriginalOnly}
           view={view}
           bookmarkCount={bookmarks.length}
           onView={setView}

@@ -4,6 +4,8 @@ export type SearchField = 'any' | 'author' | 'game' | 'title';
 
 export type TrackSource = 'sndh' | 'local' | 'amiga' | 'cpc' | 'c64';
 
+export type TrackOriginKind = 'game' | 'demo' | 'remix' | 'conversion' | 'cover';
+
 export interface Track {
   id: string;
   source: TrackSource;
@@ -19,6 +21,9 @@ export interface Track {
   year?: string;
   timestamp?: string;
   durationSeconds?: number;
+  /** False for demos, remixes, conversions, and covers — hidden when “Game music only” is on. */
+  originalGame?: boolean;
+  originKind?: TrackOriginKind;
   streamUrl: string;
   coverUrl?: string;
   detailUrl?: string;

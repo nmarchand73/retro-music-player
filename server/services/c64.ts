@@ -2,6 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { matchesAllTokens, matchesNormalizedGame, normalizeGameKey, searchTokens } from '../searchQuery.js';
 import type { SearchField, Track } from '../types.js';
+import {
+  applyCoverYearHeuristic,
+  classifyPathOrigin,
+  ORIGIN_KIND_LABELS,
+  type TrackOriginKind,
+} from '../../src/utils/trackOrigin.js';
 import { DATA_ROOT, PROJECT_ROOT } from '../paths.js';
 
 const SEARCH_LIMIT = 80;
@@ -28,6 +34,8 @@ export interface C64Record {
   durationSeconds?: number;
   timestamp?: string;
   sizeBytes: number;
+  originalGame: boolean;
+  originKind: TrackOriginKind;
 }
 
 let indexPromise: Promise<C64Record[]> | null = null;
@@ -144,6 +152,8 @@ function toTrack(record: C64Record): Track {
     year: record.year,
     durationSeconds: record.durationSeconds,
     timestamp: record.timestamp,
+    originalGame: record.originalGame,
+    originKind: record.originKind,
     streamUrl: `/api/stream/c64/${record.id}`,
     detailUrl: HVSC_DETAIL,
   };
@@ -192,7 +202,15 @@ async function indexFile(
     const artist = !isPlaceholderAuthor(headerAuthor) ? headerAuthor : folderArtist;
     const game = gameFromGamesPath(relativePath);
     const year = yearFromReleased(released);
-    const notes = ['HVSC', released].filter(Boolean).join(' · ') || undefined;
+    const origin = classifyPathOrigin({
+      relativePath,
+      title,
+      filename: path.basename(absolutePath),
+    });
+    const notes =
+      ['HVSC', released, origin.originalGame ? undefined : ORIGIN_KIND_LABELS[origin.originKind]]
+        .filter(Boolean)
+        .join(' · ') || undefined;
     const durationSeconds = songlengths.get(relativePath);
     const stat = await handle.stat();
 
@@ -209,6 +227,8 @@ async function indexFile(
       durationSeconds,
       timestamp: stat.mtime.toISOString(),
       sizeBytes: stat.size,
+      originalGame: origin.originalGame,
+      originKind: origin.originKind,
     };
   } finally {
     await handle.close();
@@ -236,6 +256,13 @@ async function buildIndex(): Promise<C64Record[]> {
   }
 
   records.sort((a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title));
+  applyCoverYearHeuristic(records);
+  for (const record of records) {
+    if (record.originalGame || !record.originKind || record.originKind === 'game') continue;
+    const label = ORIGIN_KIND_LABELS[record.originKind];
+    if (record.notes?.includes(label)) continue;
+    record.notes = [record.notes, label].filter(Boolean).join(' · ') || label;
+  }
   console.log(`[c64] indexed ${records.length.toLocaleString('en-US')} SID files`);
   return records;
 }
