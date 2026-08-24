@@ -47,6 +47,7 @@ export function createGreenBarFloorTexture(
   /** Paper distance scrolled in pixels (positive = feed toward viewer). */
   let feedPx = 0;
   let lastHistoryKey = '';
+  let lastDrawnFeedPx = Number.NaN;
   let lines = [...C64_ASM_LINES];
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -59,7 +60,8 @@ export function createGreenBarFloorTexture(
 
   const update: GreenBarFloorHandle['update'] = ({ playing, dt, title, text }) => {
     const historyKey = `${title ?? ''}\0${text ?? ''}`;
-    if (historyKey !== lastHistoryKey) {
+    const historyChanged = historyKey !== lastHistoryKey;
+    if (historyChanged) {
       lastHistoryKey = historyKey;
       const history =
         title && text
@@ -69,6 +71,10 @@ export function createGreenBarFloorTexture(
     }
 
     if (playing) feedPx += dt * ROW_PX * ROWS_PER_SEC;
+
+    if (!historyChanged && !playing && lastDrawnFeedPx === feedPx) return;
+    if (!historyChanged && playing && Math.abs(feedPx - lastDrawnFeedPx) < 1.5) return;
+    lastDrawnFeedPx = feedPx;
 
     const margin = Math.max(32, width * 0.055);
     const holeR = Math.max(4, ROW_PX * 0.18);

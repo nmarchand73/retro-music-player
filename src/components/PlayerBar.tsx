@@ -436,7 +436,17 @@ export function PlayerBar({
           {error && <span className="player-error">{error}</span>}
         </div>
 
-        <MiniSpectrum analyser={analyser} playing={playing} />
+        {visualizerMode === 'pianoRoll' ? (
+          <PianoRoll
+            analyser={analyser}
+            playing={playing}
+            playbackPosition={position}
+            trackerSong={trackerSong}
+            trackerPlayback={trackerPlayback}
+          />
+        ) : (
+          <MiniSpectrum analyser={analyser} playing={playing} />
+        )}
 
         <div className="player-controls">
           {fxRail}

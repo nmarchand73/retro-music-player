@@ -4,15 +4,25 @@ import {
   type TrackerPlayback,
   type TrackerSong,
 } from '../utils/trackerFormat';
+import { detectChipPitches } from '../utils/pitchDetect';
+import {
+  blockBottomY,
+  blockPhase,
+  layoutWaterfall,
+  pruneWaterfallBlocks,
+  type WaterfallBlock,
+  type WaterfallLayout,
+} from '../utils/waterfallNotes';
 
 const MIDI_LO = 36; // C2
 const MIDI_HI = 96; // C7
 const KEY_COUNT = MIDI_HI - MIDI_LO + 1;
 const KEYBOARD_RATIO = 0.16;
-/** Playhead sits on the bottom edge of the roll — notes “hit” here when they sound. */
-const PLAYHEAD_INSET = 3;
-const HISTORY_MS = 4200;
-const SPECTRAL_HOLD_MS = 90;
+const PITCH_GATE = 0.18;
+const KEYBOARD_SPECTRUM_GATE = 0.07;
+const PITCH_SAMPLE_MS = 1000 / 32;
+/** Ignore brief pitch drop-outs so falling notes are not restarted mid-fall. */
+const PITCH_RELEASE_HOLD_MS = 120;
 const TRACKER_ROWS_AHEAD = 26;
 const TRACKER_ROWS_BEHIND = 6;
 const DEFAULT_ROW_DURATION_SEC = 0.05;
@@ -21,48 +31,22 @@ const CHANNEL_COLORS = ['#e2185a', '#d43aa8', '#7b4ec4', '#3d9be8', '#f0a030', '
 interface PianoRollProps {
   analyser: AnalyserNode | null;
   playing: boolean;
-  /** Seconds — used to interpolate tracker rows between openmpt updates. */
   playbackPosition?: number;
   trackerSong?: TrackerSong | null;
   trackerPlayback?: TrackerPlayback | null;
 }
 
-type SpectralNote = {
-  midi: number;
-  startMs: number;
-  endMs: number | null;
-  energy: number;
-  lastSeenMs: number;
-};
+function spectrogramColor(midi: number, alpha: number, live: boolean): string {
+  if (alpha <= 0) return 'transparent';
+  const hue = 300 + ((midi - MIDI_LO) / KEY_COUNT) * 58;
+  const sat = live ? 88 : 72;
+  const light = live ? 48 + alpha * 22 : 36 + alpha * 18;
+  return `hsla(${hue}, ${sat}%, ${light}%, ${Math.min(1, alpha * (live ? 1 : 0.72))})`;
+}
 
 function isBlackKey(midi: number): boolean {
   const n = midi % 12;
   return n === 1 || n === 3 || n === 6 || n === 8 || n === 10;
-}
-
-function midiToHz(midi: number): number {
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
-
-function noteEnergy(
-  freqData: Uint8Array,
-  sampleRate: number,
-  midi: number,
-): number {
-  const nyquist = sampleRate / 2;
-  const binHz = nyquist / Math.max(1, freqData.length - 1);
-  const center = midiToHz(midi);
-  const halfWidth = Math.max(binHz * 1.2, center * 0.03);
-  const lo = Math.max(1, Math.floor((center - halfWidth) / binHz));
-  const hi = Math.min(freqData.length - 1, Math.ceil((center + halfWidth) / binHz));
-  let peak = 0;
-  for (let i = lo; i <= hi; i += 1) {
-    const v = freqData[i] ?? 0;
-    if (v > peak) peak = v;
-  }
-  const gate = 28 + ((MIDI_HI - midi) / KEY_COUNT) * 18;
-  if (peak < gate) return 0;
-  return Math.min(1, Math.pow((peak - gate * 0.4) / 255, 1.05));
 }
 
 function fillRoundRect(
@@ -92,6 +76,145 @@ function channelColor(channel: number, alpha = 1): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function readKeyboardFromSpectrum(analyser: AnalyserNode, freqBuf: Uint8Array): number[] {
+  analyser.getByteFrequencyData(freqBuf as Uint8Array<ArrayBuffer>);
+  const nyquist = analyser.context.sampleRate / 2;
+  const binCount = freqBuf.length;
+  let maxNorm = 0;
+  const scratch = new Float32Array(KEY_COUNT);
+
+  for (let i = 0; i < KEY_COUNT; i += 1) {
+    const midi = MIDI_LO + i;
+    const loHz = 440 * Math.pow(2, (midi - 0.58 - 69) / 12);
+    const hiHz = 440 * Math.pow(2, (midi + 0.58 - 69) / 12);
+    const lo = Math.max(0, Math.floor((loHz / nyquist) * binCount));
+    const hi = Math.min(binCount - 1, Math.ceil((hiHz / nyquist) * binCount));
+    let peak = 0;
+    for (let b = lo; b <= hi; b += 1) peak = Math.max(peak, freqBuf[b] ?? 0);
+    const norm = peak / 255;
+    scratch[i] = norm;
+    maxNorm = Math.max(maxNorm, norm);
+  }
+
+  const gate = Math.max(KEYBOARD_SPECTRUM_GATE, maxNorm * 0.42);
+  const midis: number[] = [];
+  for (let i = 0; i < KEY_COUNT; i += 1) {
+    if (scratch[i]! >= gate) midis.push(MIDI_LO + i);
+  }
+  return midis;
+}
+
+function syncKeyboardLights(
+  activeMidi: Set<number>,
+  nowMs: number,
+  rollH: number,
+  blocks: WaterfallBlock[],
+  liveMidis: Map<number, WaterfallBlock>,
+  analyser: AnalyserNode | null,
+  playing: boolean,
+  freqBuf: Uint8Array | null,
+): void {
+  for (const midi of liveMidis.keys()) activeMidi.add(midi);
+
+  const layout = layoutWaterfall(rollH);
+  for (const block of blocks) {
+    const bottom = blockBottomY(block, nowMs, layout);
+    const phase = blockPhase(block, nowMs, layout);
+    if (phase === 'live') {
+      activeMidi.add(block.midi);
+      continue;
+    }
+    if (phase === 'falling' && bottom >= layout.playheadY - layout.rowH * 1.5) {
+      activeMidi.add(block.midi);
+    }
+  }
+
+  if (analyser && freqBuf && playing) {
+    for (const midi of readKeyboardFromSpectrum(analyser, freqBuf)) activeMidi.add(midi);
+  }
+}
+
+function readActivePitches(
+  timeDomain: Float32Array,
+  sampleRate: number,
+): { midi: number; clarity: number }[] {
+  const hits = detectChipPitches(timeDomain, sampleRate, 4, MIDI_LO, MIDI_HI);
+  if (hits.length === 0) return [];
+
+  let maxClarity = 0;
+  for (const hit of hits) maxClarity = Math.max(maxClarity, hit.clarity);
+  const gate = Math.max(PITCH_GATE, maxClarity - 0.18);
+
+  return hits
+    .filter((hit) => hit.clarity >= gate)
+    .map((hit) => ({
+      midi: hit.midi,
+      clarity: Math.min(1, hit.clarity / Math.max(gate, 0.01)),
+    }));
+}
+
+function drawScrollingGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  playheadY: number,
+  nowMs: number,
+  layout: WaterfallLayout,
+): void {
+  const spacing = layout.rowH;
+  const offset = (nowMs % layout.fallMs) * layout.pxPerMs;
+  ctx.strokeStyle = 'rgba(255, 248, 238, 0.06)';
+  ctx.lineWidth = 1;
+  for (let y = playheadY - offset; y > -spacing; y -= spacing) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+}
+
+function drawWaterfallBlock(
+  ctx: CanvasRenderingContext2D,
+  block: WaterfallBlock,
+  nowMs: number,
+  layout: WaterfallLayout,
+  keyW: number,
+  rollH: number,
+  activeMidi: Set<number>,
+): void {
+  const phase = blockPhase(block, nowMs, layout);
+  const noteBottom = blockBottomY(block, nowMs, layout);
+  const minH = layout.rowH * 0.65;
+  let noteH = minH;
+
+  if (phase === 'live') {
+    const heldMs = Math.max(0, (block.releaseMs ?? nowMs) - (block.spawnMs + layout.fallMs));
+    noteH = Math.max(minH, Math.min(layout.rowH * 8, heldMs * layout.pxPerMs + minH));
+    activeMidi.add(block.midi);
+  } else if (phase === 'past') {
+    noteH = minH * 0.85;
+  }
+
+  const noteTop = noteBottom - noteH;
+  if (noteTop > rollH + layout.rowH || noteBottom < -layout.rowH) return;
+
+  const x = (block.midi - MIDI_LO) * keyW + 1;
+  const alpha =
+    phase === 'live'
+      ? 0.58 + block.energy * 0.42
+      : phase === 'falling'
+        ? 0.42 + block.energy * 0.45
+        : 0.18;
+  ctx.fillStyle = spectrogramColor(block.midi, alpha, phase === 'live');
+  fillRoundRect(
+    ctx,
+    x,
+    Math.max(0, noteTop),
+    Math.max(2, keyW - 2),
+    Math.min(noteH, rollH - Math.max(0, noteTop)),
+    Math.min(4, keyW * 0.25),
+  );
+}
+
 function drawKeyboard(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -108,9 +231,17 @@ function drawKeyboard(
     if (isBlackKey(midi)) continue;
     const x = (midi - MIDI_LO) * keyW;
     const on = activeMidi.has(midi);
-    ctx.fillStyle = on ? '#fff0f6' : '#efe6f8';
-    ctx.fillRect(x + 0.5, top + 1, keyW - 1, keyH - 2);
-    ctx.strokeStyle = 'rgba(40, 20, 60, 0.35)';
+    if (on) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + 0.5, top + 1, keyW - 1, keyH - 2);
+      ctx.strokeStyle = 'rgba(226, 24, 90, 0.85)';
+      ctx.lineWidth = Math.max(1.5, keyW * 0.08);
+    } else {
+      ctx.fillStyle = '#efe6f8';
+      ctx.fillRect(x + 0.5, top + 1, keyW - 1, keyH - 2);
+      ctx.strokeStyle = 'rgba(40, 20, 60, 0.35)';
+      ctx.lineWidth = 1;
+    }
     ctx.strokeRect(x + 0.5, top + 1, keyW - 1, keyH - 2);
     if (midi % 12 === 0) {
       ctx.fillStyle = 'rgba(60, 30, 90, 0.55)';
@@ -125,16 +256,17 @@ function drawKeyboard(
     const x = (midi - MIDI_LO) * keyW;
     const on = activeMidi.has(midi);
     const bw = keyW * 0.62;
-    ctx.fillStyle = on ? '#e2185a' : '#2a1838';
+    ctx.fillStyle = on ? '#ff2d75' : '#2a1838';
     ctx.fillRect(x + (keyW - bw) / 2, top + 1, bw, keyH * 0.58);
+    if (on) {
+      ctx.strokeStyle = 'rgba(255, 240, 246, 0.9)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + (keyW - bw) / 2, top + 1, bw, keyH * 0.58);
+    }
   }
 }
 
-function drawGrid(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  rollH: number,
-): void {
+function drawGrid(ctx: CanvasRenderingContext2D, width: number, rollH: number): void {
   const keyW = width / KEY_COUNT;
   for (let midi = MIDI_LO; midi <= MIDI_HI; midi += 1) {
     const x = (midi - MIDI_LO) * keyW;
@@ -157,13 +289,30 @@ export function PianoRoll({
   trackerPlayback = null,
 }: PianoRollProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const spectralNotesRef = useRef<Map<number, SpectralNote>>(new Map());
+  const waterfallBlocksRef = useRef<WaterfallBlock[]>([]);
+  const liveMidisRef = useRef<Map<number, WaterfallBlock>>(new Map());
+  const pendingReleaseRef = useRef<Map<number, number>>(new Map());
+  const prevClarityRef = useRef<Map<number, number>>(new Map());
+  const lastPitchSampleMsRef = useRef(0);
+  const analyserRef = useRef(analyser);
+  const trackerSongRef = useRef(trackerSong);
   const trackerPlaybackRef = useRef(trackerPlayback);
   const playbackPositionRef = useRef(playbackPosition);
   const playingRef = useRef(playing);
+  analyserRef.current = analyser;
+  trackerSongRef.current = trackerSong;
   trackerPlaybackRef.current = trackerPlayback;
   playbackPositionRef.current = playbackPosition;
   playingRef.current = playing;
+
+  /** Clear pitch blocks when the track or analyser changes (not every progress tick). */
+  useEffect(() => {
+    waterfallBlocksRef.current.length = 0;
+    liveMidisRef.current.clear();
+    pendingReleaseRef.current.clear();
+    prevClarityRef.current.clear();
+    lastPitchSampleMsRef.current = 0;
+  }, [analyser, trackerSong]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -173,9 +322,36 @@ export function PianoRoll({
     if (!ctx) return;
 
     let raf = 0;
-    const spectralNotes = spectralNotesRef.current;
-    const freqData =
-      analyser != null ? new Uint8Array(analyser.frequencyBinCount) : null;
+    const blocks = waterfallBlocksRef.current;
+    const liveMidis = liveMidisRef.current;
+    const pendingRelease = pendingReleaseRef.current;
+    const prevClarity = prevClarityRef.current;
+    let timeDomain: Float32Array<ArrayBuffer> | null = null;
+    let freqBuffer: Uint8Array | null = null;
+
+    const ensureFreqBuffer = (): Uint8Array | null => {
+      const node = analyserRef.current;
+      if (!node) return null;
+      if (!freqBuffer || freqBuffer.length !== node.frequencyBinCount) {
+        node.fftSize = 8192;
+        node.smoothingTimeConstant = 0.35;
+        freqBuffer = new Uint8Array(node.frequencyBinCount);
+      }
+      return freqBuffer;
+    };
+
+    const ensureTimeDomain = (): Float32Array<ArrayBuffer> | null => {
+      const node = analyserRef.current;
+      if (!node) return null;
+      if (!timeDomain || timeDomain.length !== node.fftSize) {
+        node.fftSize = 8192;
+        node.smoothingTimeConstant = 0.35;
+        timeDomain = new Float32Array(
+          new ArrayBuffer(node.fftSize * Float32Array.BYTES_PER_ELEMENT),
+        );
+      }
+      return timeDomain;
+    };
 
     let lastTrackerRow = -1;
     let rowAnchorPos = 0;
@@ -220,20 +396,23 @@ export function PianoRoll({
     const paintTracker = (
       now: number,
       width: number,
-      playheadY: number,
       rollH: number,
       activeMidi: Set<number>,
     ) => {
-      const song = trackerSong;
+      const song = trackerSongRef.current;
       const playback = trackerPlaybackRef.current;
       if (!song || !playback) return false;
       const pattern = song.patterns[playback.pattern];
       if (!pattern?.rows?.length) return false;
 
       const channelCount = Math.min(song.channels.length || 4, 8);
-      const rowH = rollH / (TRACKER_ROWS_AHEAD + 1);
+      const rowH = rollH / (TRACKER_ROWS_AHEAD + TRACKER_ROWS_BEHIND + 1);
       const keyW = width / KEY_COUNT;
       const playRow = effectiveTrackerRow(now);
+      const layout = layoutWaterfall(rollH);
+      const playheadLine = layout.playheadY;
+
+      drawScrollingGrid(ctx, width, playheadLine, now, layout);
 
       const lookBehind = TRACKER_ROWS_BEHIND;
       const lookAhead = TRACKER_ROWS_AHEAD;
@@ -242,8 +421,7 @@ export function PianoRoll({
 
       for (let row = firstRow; row <= lastRow; row += 1) {
         const raw = pattern.rows[row] ?? [];
-        /** Bottom of the note bar: aligns with playhead when the row fires. */
-        const noteBottom = playheadY + (playRow - row) * rowH;
+        const noteBottom = playheadLine + (playRow - row) * rowH;
 
         for (let ch = 0; ch < channelCount; ch += 1) {
           const commands = raw[ch] ?? [];
@@ -254,8 +432,7 @@ export function PianoRoll({
           let hold = 1;
           for (let r = row + 1; r < pattern.rows.length && r <= row + 16; r += 1) {
             const next = (pattern.rows[r] ?? [])[ch] ?? [];
-            const nextNote = next[0] ?? 0;
-            if (nextNote) break;
+            if (next[0]) break;
             hold += 1;
           }
 
@@ -265,9 +442,9 @@ export function PianoRoll({
 
           const x = (midi - MIDI_LO) * keyW + 1;
           const delta = playRow - row;
-          const current = delta >= 0 && delta < 1;
-          const past = delta >= 1;
-          const alpha = current ? 1 : past ? 0.35 : 0.82;
+          const atPlayhead = delta >= -0.08 && delta < 1.15;
+          const past = delta >= 1.15;
+          const alpha = atPlayhead ? 1 : past ? 0.35 : 0.82;
           ctx.fillStyle = channelColor(ch, alpha);
           fillRoundRect(
             ctx,
@@ -278,83 +455,77 @@ export function PianoRoll({
             Math.min(4, keyW * 0.25),
           );
 
-          if (current) activeMidi.add(midi);
+          if (atPlayhead) activeMidi.add(midi);
         }
       }
 
       return true;
     };
 
-    const paintSpectral = (
-      now: number,
-      width: number,
-      playheadY: number,
-      rollH: number,
-      activeMidi: Set<number>,
-      pxPerMs: number,
-    ) => {
-      if (!analyser || !freqData) return;
-      analyser.getByteFrequencyData(freqData);
-      const sampleRate = analyser.context.sampleRate;
-      const notes = spectralNotes;
-      const keyW = width / KEY_COUNT;
-      const isPlaying = playingRef.current;
+    const samplePitches = (nowMs: number) => {
+      const buf = ensureTimeDomain();
+      const node = analyserRef.current;
+      if (!node || !buf || !playingRef.current) return;
+      if (nowMs - lastPitchSampleMsRef.current < PITCH_SAMPLE_MS) return;
+      lastPitchSampleMsRef.current = nowMs;
 
-      if (isPlaying) {
-        for (let midi = MIDI_LO; midi <= MIDI_HI; midi += 1) {
-          const energy = noteEnergy(freqData, sampleRate, midi);
-          const existing = notes.get(midi);
-          if (energy > 0.12) {
-            if (!existing || existing.endMs != null) {
-              notes.set(midi, {
-                midi,
-                startMs: now,
-                endMs: null,
-                energy,
-                lastSeenMs: now,
-              });
-            } else {
-              existing.energy = Math.max(existing.energy * 0.7, energy);
-              existing.lastSeenMs = now;
-            }
-          } else if (existing && existing.endMs == null) {
-            if (now - existing.lastSeenMs > SPECTRAL_HOLD_MS) {
-              existing.endMs = now;
-            }
-          }
+      node.getFloatTimeDomainData(buf);
+      const active = readActivePitches(buf, node.context.sampleRate);
+      const activeSet = new Set(active.map((hit) => hit.midi));
+
+      for (const hit of active) {
+        pendingRelease.delete(hit.midi);
+        const existing = liveMidis.get(hit.midi);
+        if (existing) {
+          existing.energy = Math.max(existing.energy, hit.clarity);
+        } else {
+          const block: WaterfallBlock = {
+            midi: hit.midi,
+            spawnMs: nowMs,
+            releaseMs: null,
+            energy: hit.clarity,
+          };
+          blocks.push(block);
+          liveMidis.set(hit.midi, block);
         }
-      } else {
-        for (const note of notes.values()) {
-          if (note.endMs == null) note.endMs = now;
-        }
+        prevClarity.set(hit.midi, hit.clarity);
       }
 
-      for (const [midi, note] of [...notes.entries()]) {
-        const end = note.endMs ?? now;
-        if (now - end > HISTORY_MS) {
-          notes.delete(midi);
+      for (const midi of liveMidis.keys()) {
+        if (activeSet.has(midi)) continue;
+        const pending = pendingRelease.get(midi);
+        if (pending == null) {
+          pendingRelease.set(midi, nowMs);
           continue;
         }
+        if (nowMs - pending < PITCH_RELEASE_HOLD_MS) continue;
+        const block = liveMidis.get(midi);
+        if (block) block.releaseMs = nowMs;
+        liveMidis.delete(midi);
+        pendingRelease.delete(midi);
+        prevClarity.delete(midi);
+      }
+    };
 
-        const durationMs = Math.max(40, end - note.startMs);
-        const noteBottom = playheadY + (now - note.startMs) * pxPerMs;
-        const noteH = Math.max(4, durationMs * pxPerMs);
-        const noteTop = noteBottom - noteH;
-        if (noteTop > rollH || noteBottom < 0) continue;
+    const paintWaterfall = (
+      nowMs: number,
+      width: number,
+      rollH: number,
+      activeMidi: Set<number>,
+    ) => {
+      if (!ensureTimeDomain()) return;
 
-        const live = note.endMs == null;
-        if (live) activeMidi.add(midi);
-        const alpha = live ? 0.55 + note.energy * 0.45 : 0.28;
-        const x = (midi - MIDI_LO) * keyW + 1;
-        ctx.fillStyle = channelColor(midi % 12, alpha);
-        fillRoundRect(
-          ctx,
-          x,
-          Math.max(0, noteTop),
-          Math.max(2, keyW - 2),
-          Math.min(noteH, rollH - Math.max(0, noteTop)),
-          Math.min(4, keyW * 0.25),
-        );
+      const layout = layoutWaterfall(rollH);
+      const keyW = width / KEY_COUNT;
+      const playheadLine = layout.playheadY;
+
+      samplePitches(nowMs);
+      pruneWaterfallBlocks(blocks, nowMs, layout);
+
+      drawScrollingGrid(ctx, width, playheadLine, nowMs, layout);
+
+      for (const block of blocks) {
+        drawWaterfallBlock(ctx, block, nowMs, layout, keyW, rollH, activeMidi);
       }
     };
 
@@ -364,7 +535,7 @@ export function PianoRoll({
       const height = canvas.height;
       const keyH = Math.max(28, height * KEYBOARD_RATIO);
       const rollH = height - keyH;
-      const playheadY = rollH - PLAYHEAD_INSET;
+      const playheadLine = rollH;
 
       ctx.clearRect(0, 0, width, height);
       const bg = ctx.createLinearGradient(0, 0, 0, height);
@@ -376,20 +547,30 @@ export function PianoRoll({
       drawGrid(ctx, width, rollH);
 
       const activeMidi = new Set<number>();
-      const usedTracker = paintTracker(now, width, playheadY, rollH, activeMidi);
+      const usedTracker = paintTracker(now, width, rollH, activeMidi);
       if (!usedTracker) {
-        const pxPerMs = rollH / HISTORY_MS;
-        paintSpectral(now, width, playheadY, rollH, activeMidi, pxPerMs);
+        paintWaterfall(now, width, rollH, activeMidi);
       }
+
+      syncKeyboardLights(
+        activeMidi,
+        now,
+        rollH,
+        blocks,
+        liveMidis,
+        analyserRef.current,
+        playingRef.current,
+        ensureFreqBuffer(),
+      );
 
       ctx.strokeStyle = 'rgba(255, 248, 238, 0.65)';
       ctx.lineWidth = Math.max(2, width * 0.0025);
       ctx.beginPath();
-      ctx.moveTo(0, playheadY);
-      ctx.lineTo(width, playheadY);
+      ctx.moveTo(0, playheadLine);
+      ctx.lineTo(width, playheadLine);
       ctx.stroke();
       ctx.fillStyle = 'rgba(226, 24, 90, 0.22)';
-      ctx.fillRect(0, playheadY - 5, width, 10);
+      ctx.fillRect(0, playheadLine - 4, width, 8);
 
       drawKeyboard(ctx, width, height, keyH, activeMidi);
 
@@ -399,15 +580,15 @@ export function PianoRoll({
     raf = window.requestAnimationFrame(frame);
     return () => {
       window.cancelAnimationFrame(raf);
-      spectralNotes.clear();
-      lastTrackerRow = -1;
     };
-  }, [analyser, playing, playbackPosition, trackerSong, trackerPlayback]);
+  }, []);
 
   return (
     <div className="piano-roll" aria-label="Piano roll visualizer" role="img">
       <canvas ref={canvasRef} className="piano-roll-canvas" />
-      <span className="piano-roll-badge">Piano roll</span>
+      <span className="piano-roll-badge">
+        {trackerSong ? 'Tracker roll' : 'Waterfall'}
+      </span>
     </div>
   );
 }

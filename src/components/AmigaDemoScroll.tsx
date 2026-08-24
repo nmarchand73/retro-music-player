@@ -125,7 +125,7 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
       const parent = canvas.parentElement;
       if (!parent) return;
       const rect = parent.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      dpr = Math.min(window.devicePixelRatio || 1, 1.25);
       width = Math.max(2, Math.floor(rect.width));
       height = Math.max(2, Math.floor(rect.height));
       canvas.width = Math.floor(width * dpr);
@@ -488,8 +488,6 @@ export function AmigaDemoScroll({ title, text, playing }: AmigaDemoScrollProps) 
 
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
-      const minDelta = playing && !reduceMotion ? 1000 / 40 : 1000 / 16;
-      if (last && now - last < minDelta) return;
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
       last = now;
       const t = now * 0.001;

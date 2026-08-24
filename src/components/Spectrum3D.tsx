@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { AmigaDemoScroll } from './AmigaDemoScroll';
 import { createGreenBarFloorTexture, type GreenBarFloorHandle } from './GreenBarListing';
 import { MiniSpectrum } from './MiniSpectrum';
@@ -15,11 +14,8 @@ const MAX_HEIGHT = 2.7;
 const FRAME_PAD = 1.22;
 const BAR_SPACING = 0.26;
 const BAR_RADIUS = 0.098;
-const MAX_PIXEL_RATIO = 1.25;
-const IDLE_FPS = 12;
-/** Fixed low-res mirror RT — never scales with panel/DPR (was the Safari OOM trigger). */
-const REFLECTOR_WIDTH = 512;
-const REFLECTOR_HEIGHT = 256;
+const MAX_PIXEL_RATIO = 1.15;
+const IDLE_FPS = 20;
 
 interface Spectrum3DProps {
   analyser: AnalyserNode | null;
@@ -299,11 +295,10 @@ export function Spectrum3D({
     let disposed = false;
     let frame = 0;
     let renderer: THREE.WebGLRenderer | undefined;
-    let mirror: Reflector | undefined;
     let backdropTexture: THREE.CanvasTexture | undefined;
     let listingFloor: GreenBarFloorHandle | undefined;
-    let lastFrameMs = 0;
     let lastTickMs = 0;
+    let lastIdleFrameMs = 0;
 
     const fail = (reason: unknown) => {
       console.error('[Spectrum3D]', reason);
@@ -314,7 +309,7 @@ export function Spectrum3D({
       renderer = new THREE.WebGLRenderer({
         antialias: false,
         alpha: false,
-        powerPreference: 'low-power',
+        powerPreference: 'high-performance',
         stencil: false,
         depth: true,
       });
@@ -328,7 +323,7 @@ export function Spectrum3D({
       const clear = 0x1c1230;
       scene.background = new THREE.Color(clear);
       if (isBackdrop) renderer.setClearColor(clear, 1);
-      scene.fog = new THREE.Fog(0x2a1848, 18, 36);
+      scene.fog = new THREE.Fog(0x2a1848, 22, 42);
 
       const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 40);
 
@@ -360,19 +355,7 @@ export function Spectrum3D({
       backdrop.position.set(0, 3.4, -5.6);
       scene.add(backdrop);
 
-      // Light Reflector: fixed 512×256 RT, no MSAA, never resized with the panel.
-      mirror = new Reflector(new THREE.PlaneGeometry(18, 10), {
-        clipBias: 0.003,
-        textureWidth: REFLECTOR_WIDTH,
-        textureHeight: REFLECTOR_HEIGHT,
-        color: 0xe8f2e4,
-        multisample: 0,
-      });
-      mirror.rotation.x = -Math.PI / 2;
-      mirror.position.y = 0;
-      scene.add(mirror);
-
-      listingFloor = createGreenBarFloorTexture(1024, 512);
+      listingFloor = createGreenBarFloorTexture(640, 320);
       const listingMat = new THREE.MeshBasicMaterial({
         map: listingFloor.texture,
         transparent: true,
@@ -397,7 +380,7 @@ export function Spectrum3D({
       const color = new THREE.Color();
       const peakColor = new THREE.Color();
 
-      const barGeo = new THREE.CylinderGeometry(radius * 0.72, radius, 1, 12, 1, false);
+      const barGeo = new THREE.CylinderGeometry(radius * 0.72, radius, 1, 8, 1, false);
       barGeo.translate(0, 0.5, 0);
       const barMat = createSpectrumBarMaterial({
         roughness: 0.28,
@@ -408,7 +391,7 @@ export function Spectrum3D({
       bars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(bars);
 
-      const capGeo = new THREE.SphereGeometry(radius * 0.78, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.55);
+      const capGeo = new THREE.SphereGeometry(radius * 0.78, 6, 4, 0, Math.PI * 2, 0, Math.PI * 0.55);
       const capMat = new THREE.MeshStandardMaterial({
         roughness: 0.22,
         metalness: 0.55,
@@ -422,18 +405,17 @@ export function Spectrum3D({
       const mirrorMat = createSpectrumBarMaterial({
         roughness: 1,
         metalness: 0,
-        emissiveIntensity: 0.08,
+        emissiveIntensity: 0.12,
         transparent: true,
-        opacity: 0.08,
+        opacity: 0.16,
         depthWrite: false,
       });
       const mirrorBars = new THREE.InstancedMesh(barGeo, mirrorMat, BAR_COUNT);
       mirrorBars.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mirrorBars.scale.y = -1;
-      // Soft ghost under the real Reflector — cheap depth cue without a second RT.
       scene.add(mirrorBars);
 
-      const peakGeo = new THREE.SphereGeometry(radius * 0.88, 8, 6);
+      const peakGeo = new THREE.SphereGeometry(radius * 0.88, 6, 4);
       const peakMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: new THREE.Color(0xffffff),
@@ -499,23 +481,23 @@ export function Spectrum3D({
       observer.observe(host);
 
       const onVisibility = () => {
-        if (!document.hidden && !disposed) {
-          lastFrameMs = 0;
-          timer.update();
-        }
+        if (!document.hidden && !disposed) timer.update();
       };
       document.addEventListener('visibilitychange', onVisibility);
 
-      const renderLoop = (now: number) => {
+      const renderLoop = () => {
         if (disposed || !renderer) return;
         frame = requestAnimationFrame(renderLoop);
 
         if (document.hidden) return;
 
+        const now = performance.now();
         const isPlaying = playingRef.current;
-        const minDelta = isPlaying ? 1000 / 45 : 1000 / IDLE_FPS;
-        if (lastFrameMs && now - lastFrameMs < minDelta) return;
-        lastFrameMs = now;
+        if (!isPlaying) {
+          const idleGap = 1000 / IDLE_FPS;
+          if (lastIdleFrameMs && now - lastIdleFrameMs < idleGap) return;
+          lastIdleFrameMs = now;
+        }
 
         try {
           timer.update();
@@ -640,12 +622,6 @@ export function Spectrum3D({
         observer.disconnect();
         document.removeEventListener('visibilitychange', onVisibility);
         timer.dispose();
-        if (mirror) {
-          scene.remove(mirror);
-          mirror.geometry.dispose();
-          mirror.dispose();
-          mirror = undefined;
-        }
         listingFloor?.dispose();
         listingFloor = undefined;
         disposeObject(scene);

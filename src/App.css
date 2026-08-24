@@ -2145,7 +2145,8 @@ select:focus-visible,
   max-width: 100%;
 }
 
-.player-bar.is-minimized .mini-spectrum {
+.player-bar.is-minimized .mini-spectrum,
+.player-bar.is-minimized .piano-roll {
   justify-self: center;
   width: clamp(12rem, 32vw, 28rem);
   min-width: 12rem;
@@ -2153,6 +2154,21 @@ select:focus-visible,
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.58),
     inset 0 -8px 14px rgba(226, 24, 90, 0.05);
+}
+
+.player-bar.is-minimized .piano-roll {
+  min-height: 3.4rem;
+  height: 3.4rem;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.player-bar.is-minimized .piano-roll-badge {
+  font-size: 0.55rem;
+  top: 0.25rem;
+  left: 0.4rem;
+  opacity: 0.75;
 }
 
 .player-bar.is-minimized .player-controls {
@@ -2541,10 +2557,16 @@ select:focus-visible,
     gap: 0.45rem;
   }
 
-  .player-bar.is-minimized .mini-spectrum {
+  .player-bar.is-minimized .mini-spectrum,
+  .player-bar.is-minimized .piano-roll {
     width: clamp(8rem, 28vw, 16rem);
     min-width: 8rem;
     max-width: min(16rem, 34vw);
+  }
+
+  .player-bar.is-minimized .piano-roll {
+    min-height: 2.85rem;
+    height: 2.85rem;
   }
 
   .player-bar.is-minimized .player-fx-rail.is-compact .player-fx-amount {

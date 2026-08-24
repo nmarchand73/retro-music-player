@@ -135,7 +135,7 @@ export function SettingsPanel({
         </h3>
         <p className="muted">
           Expanded player stage: Spectrum 3D bars, or a vertical piano roll (Amiga tracker notes when
-          available; otherwise pitch from the live spectrum).
+          available; otherwise YIN / autocorrelation pitch detection on chip audio).
         </p>
         <fieldset className="settings-visualizer-choices">
           <legend className="sr-only">Player visualizer mode</legend>
