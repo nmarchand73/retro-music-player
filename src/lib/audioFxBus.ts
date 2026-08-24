@@ -18,7 +18,7 @@
 
 export type FxPreset = 'authentic' | 'modern' | 'hall';
 
-export type FxPlatformHint = 'amiga' | 'atari' | 'cpc' | 'c64' | 'generic';
+export type FxPlatformHint = 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade' | 'generic';
 
 export interface AudioFxSettings {
   /** Master enable; when false, always bypass. */
@@ -195,6 +195,31 @@ function toneForPlatform(hint: FxPlatformHint, hall: boolean): PlatformTone {
         satDrive: 2.3,
         glueThreshold: -21,
         glueRatio: 2.4,
+      };
+    case 'arcade':
+      return {
+        rumbleHz: 42,
+        lowShelfHz: 140,
+        lowShelfDb: 3.2,
+        scoopHz: 380,
+        scoopDb: -1.4,
+        scoopQ: 0.68,
+        presenceHz: 3600,
+        presenceDb: 2.4,
+        presenceQ: 0.82,
+        airHz: 9200,
+        airDb: hall ? 1.8 : 0.9,
+        hissCutHz: 11000,
+        hissCutDb: -0.8,
+        exciterHz: 3800,
+        exciterMix: 0.18,
+        sideHpfHz: 170,
+        sideWidth: hall ? 1.2 : 1.05,
+        plateMix: hall ? 0.38 : 0.18,
+        plateSeconds: hall ? 1.3 : 0.9,
+        satDrive: 2.4,
+        glueThreshold: -20,
+        glueRatio: 2.5,
       };
     case 'amiga':
       // Modules already have stereo content — gentle polish, less imaging

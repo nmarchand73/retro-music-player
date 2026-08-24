@@ -173,6 +173,7 @@ def _has_archives(data_dir: Path) -> bool:
         data_dir / "amiga" / "unexotica",
         data_dir / "cpc",
         data_dir / "c64" / "HVSC" / "C64Music",
+        data_dir / "vgm" / "vgmrips",
     ]
     return any(p.exists() for p in markers)
 

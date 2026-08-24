@@ -1,6 +1,8 @@
 import cors from 'cors';
 import express, { type Request, type Response } from 'express';
+import fs from 'node:fs/promises';
 import path from 'node:path';
+import { decompressVgmIfNeeded } from './utils/vgmTags.js';
 import { searchLocalCatalog, getLocalTrack } from './data/localCatalog.js';
 import { DATA_ROOT, PROJECT_ROOT } from './paths.js';
 import {
@@ -21,6 +23,14 @@ import {
   resolveC64FilePath,
   searchC64,
 } from './services/c64.js';
+import {
+  getVgmTrack,
+  loadVgmIndex,
+  localVgmStats,
+  resolveVgmFilePath,
+  searchVgm,
+} from './services/vgm.js';
+import { isVgmplayAvailable, renderVgmWithVgmplay } from './services/vgmplay.js';
 import {
   getCpcTrack,
   loadCpcIndex,
@@ -73,6 +83,7 @@ function isMusicPlatform(value: string): value is MusicPlatform {
     case 'atari':
     case 'cpc':
     case 'c64':
+    case 'arcade':
       return true;
     default:
       return false;
@@ -89,6 +100,8 @@ async function loadLiveTrack(source: string, id: string): Promise<Track | null> 
       return getCpcTrack(id);
     case 'c64':
       return getC64Track(id);
+    case 'vgm':
+      return getVgmTrack(id);
     case 'local':
       return getLocalTrack(id) ?? null;
     default:
@@ -97,13 +110,15 @@ async function loadLiveTrack(source: string, id: string): Promise<Track | null> 
 }
 
 app.get('/api/health', async (_req, res) => {
-  const [sndh, amiga, cpc, c64, uade, psgplay] = await Promise.all([
+  const [sndh, amiga, cpc, c64, vgm, uade, psgplay, vgmplay] = await Promise.all([
     localSndhStats(),
     localAmigaStats(),
     localCpcStats(),
     localC64Stats(),
+    localVgmStats(),
     isUadeAvailable(),
     isPsgplayAvailable(),
+    isVgmplayAvailable(),
   ]);
   res.json({
     app: 'retro-music-player',
@@ -112,8 +127,10 @@ app.get('/api/health', async (_req, res) => {
     amigaLocal: amiga,
     cpcLocal: cpc,
     c64Local: c64,
+    vgmLocal: vgm,
     uade,
     psgplay,
+    vgmplay,
   });
 });
 
@@ -149,13 +166,15 @@ app.put('/api/prefs', async (req, res) => {
 });
 
 app.get('/api/databases', async (_req, res) => {
-  const [sndh, amiga, cpc, c64, uade, psgplay] = await Promise.all([
+  const [sndh, amiga, cpc, c64, vgm, uade, psgplay, vgmplayAvail] = await Promise.all([
     localSndhStats(),
     localAmigaStats(),
     localCpcStats(),
     localC64Stats(),
+    localVgmStats(),
     isUadeAvailable(),
     isPsgplayAvailable(),
+    isVgmplayAvailable(),
   ]);
   const databases: DatabaseInfo[] = [
     {
@@ -216,6 +235,20 @@ app.get('/api/databases', async (_req, res) => {
       requiresKey: false,
       stats: c64.connected
         ? `${c64.count.toLocaleString('en-US')} local SID files`
+        : 'Archive missing',
+    },
+    {
+      id: 'vgm',
+      name: 'VGMRips Arcade',
+      description: vgm.connected
+        ? 'Local VGMRips arcade packs — YM2151, OKI, SegaPCM… played in-browser (libvgm WASM) or via vgmplay when installed.'
+        : 'Run scripts/fetch-vgmrips.mjs to download Out Run, Sega, and Data East packs into data/vgm/vgmrips.',
+      platform: 'arcade',
+      url: 'https://vgmrips.net/',
+      connected: vgm.connected,
+      requiresKey: false,
+      stats: vgm.connected
+        ? `${vgm.count.toLocaleString('en-US')} local VGM files · browser WASM`
         : 'Archive missing',
     },
     {
@@ -302,6 +335,9 @@ app.get('/api/search', async (req, res) => {
     if (includesSearchMachine(platform, machines, 'c64')) {
       tasks.push(searchC64(query, field));
     }
+    if (includesSearchMachine(platform, machines, 'arcade')) {
+      tasks.push(searchVgm(query, field));
+    }
 
     const resultSets = await Promise.allSettled(tasks);
     const tracks = resultSets.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
@@ -313,11 +349,12 @@ app.get('/api/search', async (req, res) => {
     }
     const covered = await attachGameCovers(Array.from(unique.values()));
 
-    const [sndh, amiga, cpc, c64] = await Promise.all([
+    const [sndh, amiga, cpc, c64, vgm] = await Promise.all([
       localSndhStats(),
       localAmigaStats(),
       localCpcStats(),
       localC64Stats(),
+      localVgmStats(),
     ]);
     const response: SearchResponse = {
       query,
@@ -349,6 +386,12 @@ app.get('/api/search', async (req, res) => {
           message: c64.connected
             ? `Local HVSC archive (${c64.count.toLocaleString('en-US')} SID files)`
             : 'No local HVSC dump — add C64Music under data/c64/HVSC',
+        },
+        vgm: {
+          connected: vgm.connected,
+          message: vgm.connected
+            ? `Local VGMRips arcade (${vgm.count.toLocaleString('en-US')} files)`
+            : 'No local VGM dump — run scripts/fetch-vgmrips.mjs',
         },
         local: {
           connected: true,
@@ -546,6 +589,47 @@ app.get('/api/stream/:source/:id', async (req, res) => {
       return;
     }
 
+    if (source === 'vgm') {
+      const localPath = await resolveVgmFilePath(id);
+      if (!localPath) {
+        res.status(404).json({ error: 'VGM track not found' });
+        return;
+      }
+      const forceRaw = String(req.query.raw ?? '') === '1' || String(req.query.download ?? '') === '1';
+
+      if (!forceRaw && (await isVgmplayAvailable())) {
+        try {
+          const wavPath = await renderVgmWithVgmplay(localPath);
+          const duration = await wavDurationSeconds(wavPath);
+          res.setHeader('Content-Type', 'audio/wav');
+          res.setHeader('X-Playback-Engine', 'vgmplay');
+          if (duration) res.setHeader('X-Duration-Seconds', String(Math.round(duration * 10) / 10));
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.sendFile(wavPath);
+          return;
+        } catch (error) {
+          console.warn('[vgmplay]', id, error instanceof Error ? error.message : error);
+        }
+      }
+
+      if (localPath.toLowerCase().endsWith('.vgz') && forceRaw) {
+        const data = await fs.readFile(localPath);
+        const { body } = decompressVgmIfNeeded(data);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('X-Playback-Engine', 'vgm');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.send(body);
+        return;
+      }
+
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('X-Playback-Engine', 'vgm');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.sendFile(localPath);
+      return;
+    }
+
     if (source === 'amiga') {
       const localPath = await resolveAmigaFilePath(id);
       if (!localPath) {
@@ -648,13 +732,15 @@ app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-const [sndhIndex, amigaIndex, cpcIndex, c64Index, uade, psgplay] = await Promise.all([
+const [sndhIndex, amigaIndex, cpcIndex, c64Index, vgmIndex, uade, psgplay, vgmplay] = await Promise.all([
   loadSndhIndex(),
   loadAmigaIndex(),
   loadCpcIndex(),
   loadC64Index(),
+  loadVgmIndex(),
   isUadeAvailable(),
   isPsgplayAvailable(),
+  isVgmplayAvailable(),
 ]);
 app.listen(PORT, HOST, () => {
   console.log(`Retro Music Player API on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
@@ -679,10 +765,20 @@ app.listen(PORT, HOST, () => {
       ? `Local HVSC archive: ${c64Index.length.toLocaleString('en-US')} SID files`
       : 'No local HVSC archive — extract HVSC into data/c64/HVSC/C64Music',
   );
+  console.log(
+    vgmIndex.length > 0
+      ? `Local VGMRips arcade: ${vgmIndex.length.toLocaleString('en-US')} files`
+      : 'No local VGM archive — run scripts/fetch-vgmrips.mjs',
+  );
   console.log(uade ? 'UADE: available (exotic Amiga formats)' : 'UADE: not found — brew install uade');
   console.log(
     psgplay
       ? 'psgplay: available (digi/sample SNDH, same family as sndh.atari.org)'
       : 'psgplay: not found — place binary in vendor/bin/psgplay',
+  );
+  console.log(
+    vgmplay
+      ? 'vgmplay: available (arcade VGM → WAV)'
+      : 'vgmplay: not found — install libvgm VGMPlay or set VGMPLAY_BIN',
   );
 });

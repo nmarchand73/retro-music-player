@@ -25,6 +25,8 @@ function extensionForTrack(track: Track): string {
       return 'mod';
     case 'local':
       return 'sndh';
+    case 'vgm':
+      return 'vgm';
     default: {
       const _exhaustive: never = track.source;
       return _exhaustive;
@@ -40,7 +42,7 @@ export function trackDownloadFilename(track: Track): string {
 /** Original chip/module file via the stream API (`?raw=1` where applicable). */
 export function trackDownloadUrl(track: Track): string {
   const url = new URL(absoluteStreamUrl(track.streamUrl), window.location.origin);
-  if (track.source === 'sndh' || track.source === 'amiga' || track.source === 'local') {
+  if (track.source === 'sndh' || track.source === 'amiga' || track.source === 'local' || track.source === 'vgm') {
     url.searchParams.set('raw', '1');
   }
   url.searchParams.set('download', '1');

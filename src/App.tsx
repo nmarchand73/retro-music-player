@@ -15,7 +15,7 @@ import type { DatabaseInfo, LibrarySearch, MusicPlatform, SearchField, Track } f
 import { SEARCH_FIELD_LABELS, SEARCH_FIELD_PLACEHOLDERS } from './types';
 import { sortTracks, type SortKey } from './utils/sortTracks';
 import { isTrackPlayable } from './utils/amigaPlayable';
-import { enabledMachines, MACHINE_LABELS, machinesQueryValue, type MachineId } from './utils/machines';
+import { enabledMachines, MACHINE_IDS, MACHINE_LABELS, machinesQueryValue, type MachineId } from './utils/machines';
 import { trackKey } from './utils/trackKey';
 import './App.css';
 
@@ -297,7 +297,7 @@ function App() {
               onChange={(event) => setPlatform(event.target.value as MusicPlatform)}
             >
               <option value="all">
-                {activeMachines.length === 4 ? 'All platforms' : `Enabled (${activeMachines.length})`}
+                {activeMachines.length === MACHINE_IDS.length ? 'All platforms' : `Enabled (${activeMachines.length})`}
               </option>
               {activeMachines.map((id) => (
                 <option key={id} value={id}>

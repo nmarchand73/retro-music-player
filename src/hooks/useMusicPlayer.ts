@@ -10,6 +10,7 @@ import {
   type AudioFxSettings,
   type FxPlatformHint,
 } from '../lib/audioFxBus';
+import { getVgmPlayer, vgmFilename, type VgmPlayInstance } from '../lib/vgmPlayer';
 import { SidPlayer } from '../lib/sidPlayer';
 import { TrackerPlayer } from '../lib/trackerPlayer';
 import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
@@ -156,6 +157,11 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
   const endedRef = useRef(false);
   const onEndedRef = useRef<(() => void) | null>(null);
   const progressTimerRef = useRef<number | null>(null);
+  const vgmPlayerRef = useRef<VgmPlayInstance | null>(null);
+  const vgmPausedRef = useRef(false);
+  const vgmStartedAtRef = useRef(0);
+  const vgmPauseOffsetRef = useRef(0);
+  const vgmDurationRef = useRef<number | null>(null);
 
   useEffect(() => {
     fxBusRef.current?.applySettings(audioFx);
@@ -246,6 +252,19 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       URL.revokeObjectURL(audioObjectUrlRef.current);
       audioObjectUrlRef.current = null;
     }
+
+    if (vgmPlayerRef.current) {
+      try {
+        vgmPlayerRef.current.masterGain?.disconnect();
+      } catch {
+        // already disconnected
+      }
+      vgmPlayerRef.current.stop();
+      vgmPlayerRef.current = null;
+    }
+    vgmPausedRef.current = false;
+    vgmPauseOffsetRef.current = 0;
+    vgmDurationRef.current = null;
 
     ymDurationRef.current = null;
     ymSamplesOutRef.current = 0;
@@ -363,6 +382,77 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
       subsongCount: count > 1 ? count : 0,
     }));
   }, [connectThroughFx]);
+
+  const playVgm = useCallback(
+    async (arrayBuffer: ArrayBuffer, ctx: AudioContext, hint: FxPlatformHint, track: Track) => {
+      const player = await getVgmPlayer();
+      await player.init({ audioContext: ctx });
+      vgmPlayerRef.current = player;
+      vgmPausedRef.current = false;
+      endedRef.current = false;
+      vgmDurationRef.current = track.durationSeconds ?? null;
+
+      const ok = await player.playFromBuffer(
+        new Uint8Array(arrayBuffer),
+        vgmFilename(track.format),
+        1,
+      );
+      if (!ok) throw new Error('Could not decode VGM file');
+
+      if (!player.masterGain) throw new Error('VGM audio output unavailable');
+      try {
+        player.masterGain.disconnect();
+      } catch {
+        // first connect
+      }
+      const analyser = connectThroughFx(player.masterGain, ctx, hint);
+      vgmStartedAtRef.current = ctx.currentTime;
+      vgmPauseOffsetRef.current = 0;
+
+      clearProgressTimer();
+      progressTimerRef.current = window.setInterval(() => {
+        const current = vgmPlayerRef.current;
+        if (!current) return;
+
+        if (current.hasEnded()) {
+          if (endedRef.current) return;
+          endedRef.current = true;
+          current.stop();
+          setState((prev) => ({
+            ...prev,
+            status: 'idle',
+            position: vgmDurationRef.current ?? prev.duration,
+          }));
+          onEndedRef.current?.();
+          return;
+        }
+
+        if (vgmPausedRef.current) return;
+
+        const elapsed = Math.max(0, ctx.currentTime - vgmStartedAtRef.current);
+        const duration = vgmDurationRef.current;
+        const position = duration != null ? Math.min(elapsed, duration) : elapsed;
+
+        setState((prev) => ({
+          ...prev,
+          position,
+          duration: duration ?? prev.duration,
+          status: 'playing',
+        }));
+      }, 200);
+
+      setState((prev) => ({
+        ...prev,
+        status: 'playing',
+        duration: track.durationSeconds ?? 0,
+        analyser,
+        channelMutes: null,
+        trackerSong: null,
+        trackerPlayback: null,
+      }));
+    },
+    [connectThroughFx],
+  );
 
   const playWav = useCallback(async (
     arrayBuffer: ArrayBuffer,
@@ -579,14 +669,22 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
         if (
           engine === 'uade' ||
           engine === 'psgplay' ||
+          engine === 'vgmplay' ||
           contentType.includes('audio/wav') ||
           contentType.includes('audio/wave')
         ) {
           const hint: FxPlatformHint =
-            engine === 'psgplay' || track.platform === 'atari' || track.format.toUpperCase() === 'SNDH'
-              ? 'atari'
-              : 'amiga';
+            engine === 'vgmplay' || track.source === 'vgm' || track.platform === 'arcade'
+              ? 'arcade'
+              : engine === 'psgplay' || track.platform === 'atari' || track.format.toUpperCase() === 'SNDH'
+                ? 'atari'
+                : 'amiga';
           await playWav(arrayBuffer, ctx, hint);
+          return;
+        }
+
+        if (track.source === 'vgm' || track.platform === 'arcade' || engine === 'vgm') {
+          await playVgm(arrayBuffer, ctx, 'arcade', track);
           return;
         }
 
@@ -622,7 +720,7 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
         }));
       }
     },
-    [playMod, playSid, playSndh, playWav, stopAll],
+    [playMod, playSid, playSndh, playVgm, playWav, stopAll],
   );
 
   const pause = useCallback(() => {
@@ -644,6 +742,14 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
     if (ymPlayerRef.current) {
       ymPausedRef.current = true;
       ymPlayerRef.current.pause();
+      setState((prev) => ({ ...prev, status: 'paused' }));
+      return;
+    }
+    if (vgmPlayerRef.current) {
+      vgmPausedRef.current = true;
+      vgmPauseOffsetRef.current =
+        (audioContextRef.current?.currentTime ?? 0) - vgmStartedAtRef.current;
+      vgmPlayerRef.current.pause();
       setState((prev) => ({ ...prev, status: 'paused' }));
     }
   }, []);
@@ -668,6 +774,14 @@ export function useMusicPlayer(audioFx: AudioFxSettings = DEFAULT_AUDIO_FX_SETTI
     if (ymPlayerRef.current) {
       ymPausedRef.current = false;
       ymPlayerRef.current.play();
+      setState((prev) => ({ ...prev, status: 'playing' }));
+      return;
+    }
+    if (vgmPlayerRef.current) {
+      vgmPausedRef.current = false;
+      vgmStartedAtRef.current =
+        (audioContextRef.current?.currentTime ?? 0) - vgmPauseOffsetRef.current;
+      vgmPlayerRef.current.play();
       setState((prev) => ({ ...prev, status: 'playing' }));
     }
   }, []);

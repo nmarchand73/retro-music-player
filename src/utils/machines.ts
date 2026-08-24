@@ -1,12 +1,13 @@
-export type MachineId = 'atari' | 'amiga' | 'cpc' | 'c64';
+export type MachineId = 'atari' | 'amiga' | 'cpc' | 'c64' | 'arcade';
 
-export const MACHINE_IDS: readonly MachineId[] = ['atari', 'amiga', 'cpc', 'c64'] as const;
+export const MACHINE_IDS: readonly MachineId[] = ['atari', 'amiga', 'cpc', 'c64', 'arcade'] as const;
 
 export const MACHINE_LABELS: Record<MachineId, string> = {
   atari: 'Atari ST',
   amiga: 'Amiga',
   cpc: 'Amstrad CPC',
   c64: 'Commodore 64',
+  arcade: 'Arcade',
 };
 
 export const MACHINE_BLURBS: Record<MachineId, string> = {
@@ -14,6 +15,7 @@ export const MACHINE_BLURBS: Record<MachineId, string> = {
   amiga: 'UnExoticA modules (MOD, MDAT, CUST…)',
   cpc: 'CPC AY/YM dumps (SNDH + YM)',
   c64: 'HVSC SID collection',
+  arcade: 'VGMRips arcade (.vgm / .vgz)',
 };
 
 export type MachineSettings = Record<MachineId, boolean>;
@@ -23,6 +25,7 @@ export const DEFAULT_MACHINE_SETTINGS: MachineSettings = {
   amiga: true,
   cpc: true,
   c64: true,
+  arcade: true,
 };
 
 export function isMachineId(value: string): value is MachineId {

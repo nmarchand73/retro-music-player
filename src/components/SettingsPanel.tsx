@@ -25,6 +25,8 @@ function platformBadge(platform: Track['platform']): string {
       return 'CPC';
     case 'c64':
       return 'C64';
+    case 'arcade':
+      return 'ARCADE';
     default: {
       const _exhaustive: never = platform;
       return _exhaustive;

@@ -17,7 +17,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "smoketest": "playwright test",
-    "smoketest-no-compile": "playwright test"
+    "smoketest-no-compile": "playwright test",
+    "fetch:vgmrips": "node scripts/fetch-vgmrips.mjs",
+    "fetch:vgmrips:discover": "node scripts/discover-vgmrips-top-arcade.mjs",
+    "fetch:vgmplay-assets": "node scripts/fetch-vgmplay-assets.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

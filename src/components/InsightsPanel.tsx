@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { fetchInsights } from '../api';
 import type { InsightRank, InsightsResponse, InsightTrackBrief, LibrarySearch, MusicPlatform } from '../types';
 import { formatClock } from '../utils/formatTime';
-import { enabledMachines, MACHINE_LABELS, type MachineSettings } from '../utils/machines';
+import { enabledMachines, MACHINE_IDS, MACHINE_LABELS, type MachineSettings } from '../utils/machines';
 
 interface InsightsPanelProps {
   onSearch: (search: LibrarySearch) => void;
@@ -27,6 +27,7 @@ function platformMix(item: InsightRank): string {
   if (item.atariCount > 0) parts.push(`${formatCount(item.atariCount)} Atari`);
   if (item.cpcCount > 0) parts.push(`${formatCount(item.cpcCount)} CPC`);
   if (item.c64Count > 0) parts.push(`${formatCount(item.c64Count)} C64`);
+  if (item.arcadeCount > 0) parts.push(`${formatCount(item.arcadeCount)} Arcade`);
   return parts.join(' · ');
 }
 
@@ -40,6 +41,8 @@ function briefPlatformLabel(platform: InsightTrackBrief['platform']): string {
       return 'CPC';
     case 'c64':
       return 'C64';
+    case 'arcade':
+      return 'ARCADE';
     default: {
       const _exhaustive: never = platform;
       throw new Error(`Unhandled platform: ${_exhaustive}`);
@@ -218,7 +221,7 @@ export function InsightsPanel({ onSearch, machines, machinesParam }: InsightsPan
             onChange={(event) => setPlatform(event.target.value as MusicPlatform)}
           >
             <option value="all">
-              {activeMachines.length === 4 ? 'All platforms' : `Enabled (${activeMachines.length})`}
+              {activeMachines.length === MACHINE_IDS.length ? 'All platforms' : `Enabled (${activeMachines.length})`}
             </option>
             {activeMachines.map((id) => (
               <option key={id} value={id}>
@@ -265,6 +268,12 @@ export function InsightsPanel({ onSearch, machines, machinesParam }: InsightsPan
               </strong>
               <span>CPC / C64</span>
             </div>
+            {overview.arcade > 0 ? (
+              <div className="insight-stat">
+                <strong>{formatCount(overview.arcade)}</strong>
+                <span>Arcade VGM</span>
+              </div>
+            ) : null}
             <div className="insight-stat">
               <strong>
                 {formatCount(overview.openmpt)}
@@ -300,24 +309,34 @@ export function InsightsPanel({ onSearch, machines, machinesParam }: InsightsPan
                     item.amigaCount > 0 &&
                     item.atariCount === 0 &&
                     item.cpcCount === 0 &&
-                    item.c64Count === 0
+                    item.c64Count === 0 &&
+                    item.arcadeCount === 0
                       ? 'amiga'
                       : item.atariCount > 0 &&
                           item.amigaCount === 0 &&
                           item.cpcCount === 0 &&
-                          item.c64Count === 0
+                          item.c64Count === 0 &&
+                          item.arcadeCount === 0
                         ? 'atari'
                         : item.cpcCount > 0 &&
                             item.amigaCount === 0 &&
                             item.atariCount === 0 &&
-                            item.c64Count === 0
+                            item.c64Count === 0 &&
+                            item.arcadeCount === 0
                           ? 'cpc'
                           : item.c64Count > 0 &&
                               item.amigaCount === 0 &&
                               item.atariCount === 0 &&
-                              item.cpcCount === 0
+                              item.cpcCount === 0 &&
+                              item.arcadeCount === 0
                             ? 'c64'
-                            : platform;
+                            : item.arcadeCount > 0 &&
+                                item.amigaCount === 0 &&
+                                item.atariCount === 0 &&
+                                item.cpcCount === 0 &&
+                                item.c64Count === 0
+                              ? 'arcade'
+                              : platform;
                   onSearch({ query: item.label, field: 'author', platform: nextPlatform });
                 }}
               />
@@ -350,6 +369,10 @@ export function InsightsPanel({ onSearch, machines, machinesParam }: InsightsPan
                   }
                   if (item.label === 'SID') {
                     onSearch({ query: '', field: 'any', platform: 'c64' });
+                    return;
+                  }
+                  if (item.label === 'VGM' || item.label === 'VGZ') {
+                    onSearch({ query: '', field: 'any', platform: 'arcade' });
                     return;
                   }
                   onSearch({ query: item.label, field: 'any', platform: 'amiga' });

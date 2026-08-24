@@ -215,6 +215,7 @@ _link_archive sndh
 _link_archive amiga
 _link_archive cpc
 _link_archive c64
+_link_archive vgm
 
 echo "Built: $APP"
 echo "Open with: open \"$APP\""

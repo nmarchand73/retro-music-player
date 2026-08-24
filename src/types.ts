@@ -1,4 +1,4 @@
-export type MusicPlatform = 'amiga' | 'atari' | 'cpc' | 'c64' | 'all';
+export type MusicPlatform = 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade' | 'all';
 
 export type SearchField = 'any' | 'author' | 'game' | 'title';
 
@@ -8,14 +8,14 @@ export interface LibrarySearch {
   platform?: MusicPlatform;
 }
 
-export type TrackSource = 'sndh' | 'local' | 'amiga' | 'cpc' | 'c64';
+export type TrackSource = 'sndh' | 'local' | 'amiga' | 'cpc' | 'c64' | 'vgm';
 
 export type TrackOriginKind = 'game' | 'demo' | 'remix' | 'conversion' | 'cover';
 
 export interface Track {
   id: string;
   source: TrackSource;
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
   title: string;
   artist: string;
   format: string;
@@ -52,7 +52,7 @@ export interface DatabaseInfo {
   id: string;
   name: string;
   description: string;
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'both';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade' | 'both';
   url: string;
   apiUrl?: string;
   connected: boolean;
@@ -67,14 +67,15 @@ export interface InsightRank {
   atariCount: number;
   cpcCount: number;
   c64Count: number;
+  arcadeCount: number;
   share: number;
   coverUrl?: string;
 }
 
 export interface InsightTrackBrief {
   id: string;
-  source: 'amiga' | 'sndh' | 'cpc' | 'c64';
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
+  source: 'amiga' | 'sndh' | 'cpc' | 'c64' | 'vgm';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
   title: string;
   artist: string;
   game?: string;
@@ -94,6 +95,7 @@ export interface InsightsResponse {
     atari: number;
     cpc: number;
     c64: number;
+    arcade: number;
     composers: number;
     games: number;
     formats: number;

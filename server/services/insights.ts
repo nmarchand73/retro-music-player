@@ -4,6 +4,7 @@ import { loadAmigaIndex, type AmigaRecord } from './amiga.js';
 import { loadC64Index, type C64Record } from './c64.js';
 import { loadCpcIndex, type CpcRecord } from './cpc.js';
 import { loadSndhIndex, type SndhRecord } from './sndh.js';
+import { loadVgmIndex, type VgmRecord } from './vgm.js';
 
 const TOP_LIMIT = 200;
 const LONG_LIMIT = 200;
@@ -18,14 +19,15 @@ export interface InsightRank {
   atariCount: number;
   cpcCount: number;
   c64Count: number;
+  arcadeCount: number;
   share: number;
   coverUrl?: string;
 }
 
 export interface InsightTrackBrief {
   id: string;
-  source: 'amiga' | 'sndh' | 'cpc' | 'c64';
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
+  source: 'amiga' | 'sndh' | 'cpc' | 'c64' | 'vgm';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
   title: string;
   artist: string;
   game?: string;
@@ -45,6 +47,7 @@ export interface InsightsResponse {
     atari: number;
     cpc: number;
     c64: number;
+    arcade: number;
     composers: number;
     games: number;
     formats: number;
@@ -64,8 +67,8 @@ export interface InsightsResponse {
 
 interface FlatRecord {
   id: string;
-  source: 'amiga' | 'sndh' | 'cpc' | 'c64';
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
+  source: 'amiga' | 'sndh' | 'cpc' | 'c64' | 'vgm';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
   title: string;
   artist: string;
   game?: string;
@@ -82,6 +85,7 @@ interface Bucket {
   atariCount: number;
   cpcCount: number;
   c64Count: number;
+  arcadeCount: number;
   coverUrl?: string;
 }
 
@@ -153,6 +157,21 @@ function toFlatC64(record: C64Record): FlatRecord {
   };
 }
 
+function toFlatVgm(record: VgmRecord): FlatRecord {
+  return {
+    id: record.id,
+    source: 'vgm',
+    platform: 'arcade',
+    title: record.title,
+    artist: record.artist,
+    game: record.game,
+    year: record.year,
+    format: record.relativePath.toLowerCase().endsWith('.vgz') ? 'VGZ' : 'VGM',
+    durationSeconds: record.durationSeconds,
+    timestamp: record.timestamp,
+  };
+}
+
 function toBrief(record: FlatRecord): InsightTrackBrief {
   return {
     id: record.id,
@@ -187,6 +206,7 @@ function bump(
     atariCount: 0,
     cpcCount: 0,
     c64Count: 0,
+    arcadeCount: 0,
   };
   current.count += 1;
   switch (platform) {
@@ -201,6 +221,9 @@ function bump(
       break;
     case 'c64':
       current.c64Count += 1;
+      break;
+    case 'arcade':
+      current.arcadeCount += 1;
       break;
     default: {
       const _exhaustive: never = platform;
@@ -228,12 +251,13 @@ function ranked(
       atariCount: bucket.atariCount,
       cpcCount: bucket.cpcCount,
       c64Count: bucket.c64Count,
+      arcadeCount: bucket.arcadeCount,
       share: total > 0 ? bucket.count / total : 0,
       coverUrl: bucket.coverUrl,
     }));
 }
 
-export type InsightMachine = 'amiga' | 'atari' | 'cpc' | 'c64';
+export type InsightMachine = 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
 
 function includesMachine(
   platform: MusicPlatform,
@@ -247,13 +271,14 @@ function includesMachine(
 
 export async function buildInsights(
   platform: MusicPlatform = 'all',
-  machines: readonly InsightMachine[] = ['amiga', 'atari', 'cpc', 'c64'],
+  machines: readonly InsightMachine[] = ['amiga', 'atari', 'cpc', 'c64', 'arcade'],
 ): Promise<InsightsResponse> {
-  const [amigaIndex, sndhIndex, cpcIndex, c64Index] = await Promise.all([
+  const [amigaIndex, sndhIndex, cpcIndex, c64Index, vgmIndex] = await Promise.all([
     loadAmigaIndex(),
     loadSndhIndex(),
     loadCpcIndex(),
     loadC64Index(),
+    loadVgmIndex(),
   ]);
 
   const records: FlatRecord[] = [];
@@ -269,6 +294,9 @@ export async function buildInsights(
   if (includesMachine(platform, machines, 'c64')) {
     for (const record of c64Index) records.push(toFlatC64(record));
   }
+  if (includesMachine(platform, machines, 'arcade')) {
+    for (const record of vgmIndex) records.push(toFlatVgm(record));
+  }
 
   const authors = new Map<string, Bucket>();
   const games = new Map<string, Bucket>();
@@ -279,6 +307,7 @@ export async function buildInsights(
   let atari = 0;
   let cpc = 0;
   let c64 = 0;
+  let arcade = 0;
   let withDuration = 0;
   let withGame = 0;
   let totalDurationSeconds = 0;
@@ -301,6 +330,9 @@ export async function buildInsights(
         break;
       case 'c64':
         c64 += 1;
+        break;
+      case 'arcade':
+        arcade += 1;
         break;
       default: {
         const _exhaustive: never = record.platform;
@@ -356,6 +388,7 @@ export async function buildInsights(
       atari,
       cpc,
       c64,
+      arcade,
       composers: composerSet.size,
       games: games.size,
       formats: formats.size,

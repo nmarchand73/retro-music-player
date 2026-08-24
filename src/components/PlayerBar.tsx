@@ -12,7 +12,7 @@ import type { AudioFxSettings, FxPreset } from '../lib/audioFxBus';
 import type { Track } from '../types';
 import type { TrackerPlayback, TrackerSong } from '../utils/trackerFormat';
 import type { VisualizerMode } from '../utils/visualizerMode';
-import { formatClock, formatDuration } from '../utils/formatTime';
+import { formatClock, formatDuration, formatRemainingClock } from '../utils/formatTime';
 
 function playerPlatformLabel(platform: Track['platform']): string {
   switch (platform) {
@@ -24,6 +24,8 @@ function playerPlatformLabel(platform: Track['platform']): string {
       return 'CPC';
     case 'c64':
       return 'C64';
+    case 'arcade':
+      return 'Arcade';
     default: {
       const _exhaustive: never = platform;
       throw new Error(`Unhandled platform: ${_exhaustive}`);
@@ -357,6 +359,12 @@ export function PlayerBar({
   const shownPosition = scrub ?? position;
   const titleDuration =
     duration > 0 ? formatClock(duration) : status !== 'loading' && track ? formatDuration(duration) : null;
+  const miniDurationLabel =
+    duration > 0
+      ? formatRemainingClock(duration, shownPosition)
+      : status !== 'loading' && track
+        ? formatDuration(duration)
+        : null;
   const playing = status === 'playing';
   const demo = useMemo(() => lookupGameHistory(track?.game), [track?.game]);
 
@@ -423,7 +431,11 @@ export function PlayerBar({
               <div className="player-copy">
                 <div className="player-title">
                   <MarqueeText text={track.title} className="player-title-label" />
-                  {titleDuration && <span className="player-title-duration">{titleDuration}</span>}
+                  {miniDurationLabel && (
+                    <span className="player-title-duration" aria-label="Time remaining">
+                      {miniDurationLabel}
+                    </span>
+                  )}
                 </div>
                 <span className="player-artist">
                   {track.artist}

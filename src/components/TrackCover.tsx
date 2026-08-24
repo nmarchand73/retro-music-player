@@ -42,7 +42,9 @@ export function TrackCover({
         ? 'CPC'
         : track.platform === 'c64'
           ? 'C64'
-          : 'ST';
+          : track.platform === 'arcade'
+            ? 'ARC'
+            : 'ST';
   return (
     <span className={`${className} is-placeholder`} data-platform={track.platform} aria-hidden="true">
       {mark}

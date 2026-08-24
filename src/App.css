@@ -14,6 +14,8 @@
   --cpc-pale: #e0f4f4;
   --c64: #a67c2d;
   --c64-pale: #f5ecd8;
+  --arcade: #c41e3a;
+  --arcade-pale: #fde8ec;
   --border: #e2d4c4;
   --border-strong: #cbb8d8;
   --shadow: 0 12px 28px rgba(61, 36, 107, 0.1);
@@ -483,7 +485,7 @@ select:focus-visible,
 
 .top-games-columns {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.65rem;
   min-height: 0;
   flex: 1 1 0;
@@ -547,6 +549,10 @@ select:focus-visible,
 
 .top-games-column.source-c64 .top-games-column-header h3 {
   color: var(--c64);
+}
+
+.top-games-column.source-arcade .top-games-column-header h3 {
+  color: var(--arcade);
 }
 
 .top-games-list {
@@ -906,6 +912,12 @@ select:focus-visible,
   color: #6b4e12;
 }
 
+.track-cover.is-placeholder[data-platform='arcade'],
+.player-cover.is-placeholder[data-platform='arcade'] {
+  background: linear-gradient(180deg, #f5c4cc 0%, #c41e3a 100%);
+  color: #6b1020;
+}
+
 .player-cover {
   width: 3.9rem;
   height: 4.9rem;
@@ -1056,6 +1068,12 @@ select:focus-visible,
   background: var(--c64-pale);
   border-color: color-mix(in srgb, var(--c64) 40%, var(--border));
   color: var(--c64);
+}
+
+.platform-badge[data-platform='arcade'] {
+  background: var(--arcade-pale);
+  border-color: color-mix(in srgb, var(--arcade) 40%, var(--border));
+  color: var(--arcade);
 }
 
 .track-main {
@@ -1491,6 +1509,11 @@ select:focus-visible,
 .player-platform-chip[data-platform='c64'] {
   border-color: color-mix(in srgb, var(--c64) 45%, var(--border));
   color: var(--c64);
+}
+
+.player-platform-chip[data-platform='arcade'] {
+  border-color: color-mix(in srgb, var(--arcade) 45%, var(--border));
+  color: var(--arcade);
 }
 
 .player-stage-viz {

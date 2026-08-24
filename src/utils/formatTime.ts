@@ -13,3 +13,9 @@ export function formatTitleDuration(seconds: number | undefined | null): string 
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return null;
   return formatClock(seconds);
 }
+
+/** Countdown label for compact player chrome (remaining time). */
+export function formatRemainingClock(duration: number, position: number): string | null {
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+  return formatClock(Math.max(0, duration - Math.max(0, position)));
+}

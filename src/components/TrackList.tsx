@@ -71,6 +71,8 @@ function platformLabel(platform: Track['platform']): string {
       return 'CPC';
     case 'c64':
       return 'C64';
+    case 'arcade':
+      return 'ARCADE';
     default: {
       const _exhaustive: never = platform;
       throw new Error(`Unhandled platform: ${_exhaustive}`);
@@ -166,12 +168,12 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
       <div className="top-games-columns">
         {columns.map(({ column, games }) => (
           <section
-            key={`${kind}-${column.id}`}
-            className={`top-games-column source-${column.id}`}
-            aria-labelledby={`top-games-${kind}-${column.id}`}
+            key={`${kind}-${column.rankKey}`}
+            className={`top-games-column source-${column.rankKey}`}
+            aria-labelledby={`top-games-${kind}-${column.rankKey}`}
           >
             <header className="top-games-column-header">
-              <h3 id={`top-games-${kind}-${column.id}`}>{column.short}</h3>
+              <h3 id={`top-games-${kind}-${column.rankKey}`}>{column.short}</h3>
               <p className="muted">
                 <a
                   className="top-games-source-link"
@@ -195,10 +197,14 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                 const listLabel =
                   kind === 'music'
                     ? 'music Top 100'
-                    : column.id === 'amiga'
-                      ? '101 Jeux'
-                      : 'Top 100';
-                const rowKey = `${kind}-${column.id}-${displayRank}-${game.title}`;
+                    : column.rankKey === 'arcade-fr'
+                      ? 'Arcade FR diffusions'
+                      : column.id === 'arcade'
+                        ? 'VGMRips Top'
+                        : column.id === 'amiga'
+                          ? '101 Jeux'
+                          : 'Top 100';
+                const rowKey = `${kind}-${column.rankKey}-${displayRank}-${game.title}`;
                 const expanded = expandedKey === rowKey;
                 const hasHistory = Boolean(game.history);
                 return (
@@ -217,7 +223,7 @@ function TopGamesPanel({ onSearch }: { onSearch: (search: LibrarySearch) => void
                           onSearch({
                             query: game.searchQuery,
                             field: 'game',
-                            platform: 'all',
+                            platform: column.id === 'arcade' ? 'arcade' : 'all',
                           })
                         }
                       >

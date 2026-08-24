@@ -1,15 +1,15 @@
-export type MusicPlatform = 'amiga' | 'atari' | 'cpc' | 'c64' | 'all';
+export type MusicPlatform = 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade' | 'all';
 
 export type SearchField = 'any' | 'author' | 'game' | 'title';
 
-export type TrackSource = 'sndh' | 'local' | 'amiga' | 'cpc' | 'c64';
+export type TrackSource = 'sndh' | 'local' | 'amiga' | 'cpc' | 'c64' | 'vgm';
 
 export type TrackOriginKind = 'game' | 'demo' | 'remix' | 'conversion' | 'cover';
 
 export interface Track {
   id: string;
   source: TrackSource;
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade';
   title: string;
   artist: string;
   format: string;
@@ -44,6 +44,7 @@ export interface SearchResponse {
     amiga: { connected: boolean; message: string };
     cpc: { connected: boolean; message: string };
     c64: { connected: boolean; message: string };
+    vgm: { connected: boolean; message: string };
     local: { connected: boolean; message: string };
   };
 }
@@ -52,7 +53,7 @@ export interface DatabaseInfo {
   id: string;
   name: string;
   description: string;
-  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'both';
+  platform: 'amiga' | 'atari' | 'cpc' | 'c64' | 'arcade' | 'both';
   url: string;
   apiUrl?: string;
   connected: boolean;

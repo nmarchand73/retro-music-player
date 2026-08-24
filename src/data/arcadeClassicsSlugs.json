@@ -1,0 +1,27 @@
+{
+  "description": "French arcade-hall staples and shoot-em-up essentials (VGMRips slugs), merged into fetch:vgmrips.",
+  "games": [
+    { "slug": "r-type-irem-m72", "title": "R-Type", "searchQuery": "R-Type" },
+    { "slug": "r-type-ii-irem-m82-m84", "title": "R-Type II", "searchQuery": "R-Type II" },
+    {
+      "slug": "salamander-arcade",
+      "title": "Salamander / Life Force",
+      "searchQuery": "Salamander",
+      "note": "Gradius sequel; closest VGMRips pack to Nemesis / Life Force coin-op"
+    },
+    { "slug": "pang-mitchell", "title": "Pang", "searchQuery": "Pang" },
+    { "slug": "super-pang-mitchell", "title": "Super Pang", "searchQuery": "Super Pang" },
+    { "slug": "operation-wolf-rastan-saga", "title": "Operation Wolf", "searchQuery": "Operation Wolf" },
+    { "slug": "cabal-arcade", "title": "Cabal", "searchQuery": "Cabal" },
+    { "slug": "rastan-arcade", "title": "Rastan Saga", "searchQuery": "Rastan" },
+    { "slug": "final-fight-cp-system", "title": "Final Fight", "searchQuery": "Final Fight" },
+    { "slug": "ghosts-n-goblins-arcade", "title": "Ghosts'n Goblins", "searchQuery": "Ghosts n Goblins" },
+    { "slug": "ghouls-n-ghosts-cp-system", "title": "Ghouls'n Ghosts", "searchQuery": "Ghouls n Ghosts" },
+    { "slug": "bubble-bobble-arcade", "title": "Bubble Bobble", "searchQuery": "Bubble Bobble" },
+    { "slug": "snow-bros-arcade", "title": "Snow Bros.", "searchQuery": "Snow Bros" },
+    { "slug": "bomb-jack-arcade", "title": "Bomb Jack", "searchQuery": "Bomb Jack" },
+    { "slug": "asterix-arcade", "title": "Asterix", "searchQuery": "Asterix" },
+    { "slug": "track-field-arcade", "title": "Track & Field", "searchQuery": "Track Field" },
+    { "slug": "metal-slug-snk-neo-geo", "title": "Metal Slug", "searchQuery": "Metal Slug" }
+  ]
+}

@@ -78,6 +78,8 @@ export function isTrackPlayable(track: Track, uadeAvailable = false): boolean {
     case 'cpc':
     case 'c64':
       return true;
+    case 'arcade':
+      return true;
     default: {
       const _exhaustive: never = track.platform;
       throw new Error(`Unhandled platform: ${_exhaustive}`);

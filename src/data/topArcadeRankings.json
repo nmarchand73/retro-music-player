@@ -1,0 +1,612 @@
+{
+  "generated_at": "2026-08-24",
+  "description": "Top arcade VGM packs on VGMRips by global download ranking (Arcade folder), plus local Sega/Data East and brawler staples.",
+  "source": {
+    "name": "VGMRips Top packs",
+    "url": "https://vgmrips.net/packs/top",
+    "method": "First 100 unique arcade packs while paging the global top-download list",
+    "note": "Non-arcade entries on the global top list are skipped. A few curated coin-op staples are merged in when missing."
+  },
+  "games": [
+    {
+      "rank": 1,
+      "title": "Dragon Saber: After Story of Dragon Spirit",
+      "searchQuery": "Dragon Saber: After Story",
+      "slug": "dragon-saber-after-story-of-dragon-spirit-namco-system-2"
+    },
+    {
+      "rank": 2,
+      "title": "Out Run",
+      "searchQuery": "Out Run",
+      "slug": "out-run-arcade"
+    },
+    {
+      "rank": 3,
+      "title": "Battle Garegga",
+      "searchQuery": "Battle Garegga",
+      "slug": "battle-garegga-toaplan-2"
+    },
+    {
+      "rank": 4,
+      "title": "Daytona USA",
+      "searchQuery": "Daytona USA",
+      "slug": "daytona-usa-sega-model-2"
+    },
+    {
+      "rank": 5,
+      "title": "Galaxy Force II",
+      "searchQuery": "Galaxy Force II",
+      "slug": "galaxy-force-ii-sega-y"
+    },
+    {
+      "rank": 6,
+      "title": "Hyper Duel",
+      "searchQuery": "Hyper Duel",
+      "slug": "hyper-duel-arcade"
+    },
+    {
+      "rank": 7,
+      "title": "Armed Police Batrider",
+      "searchQuery": "Armed Police Batrider",
+      "slug": "armed-police-batrider-toaplan-2"
+    },
+    {
+      "rank": 8,
+      "title": "After Burner II",
+      "searchQuery": "After Burner II",
+      "slug": "after-burner-ii-sega-x"
+    },
+    {
+      "rank": 9,
+      "title": "Soldam",
+      "searchQuery": "Soldam",
+      "slug": "soldam-jaleco-mega-system-1"
+    },
+    {
+      "rank": 10,
+      "title": "Fantasy Zone II DX / 3D Fantasy Zone II W",
+      "searchQuery": "Fantasy Zone II DX",
+      "slug": "fantasy-zone-ii-dx-sega-system-16c"
+    },
+    {
+      "rank": 11,
+      "title": "Super Hang-On",
+      "searchQuery": "Super Hang-On",
+      "slug": "super-hang-on-arcade"
+    },
+    {
+      "rank": 12,
+      "title": "Space Harrier",
+      "searchQuery": "Space Harrier",
+      "slug": "space-harrier-hang-on"
+    },
+    {
+      "rank": 13,
+      "title": "The Ninja Warriors",
+      "searchQuery": "The Ninja Warriors",
+      "slug": "the-ninja-warriors-arcade"
+    },
+    {
+      "rank": 14,
+      "title": "Street Fighter EX2 Plus",
+      "searchQuery": "Street Fighter EX2 Plus",
+      "slug": "street-fighter-ex2-plus-capcom-zn-2"
+    },
+    {
+      "rank": 15,
+      "title": "Sunset Riders",
+      "searchQuery": "Sunset Riders",
+      "slug": "sunset-riders-konami-sunset-riders"
+    },
+    {
+      "rank": 16,
+      "title": "Undercover Cops (J) / Undercover Cops Alpha: Renewal Version (W)",
+      "searchQuery": "Undercover Cops",
+      "slug": "undercover-cops-j-irem-m92"
+    },
+    {
+      "rank": 17,
+      "title": "Street Fighter II: Champion Edition",
+      "searchQuery": "Street Fighter II: Champion",
+      "slug": "street-fighter-ii-champion-edition-cp-system"
+    },
+    {
+      "rank": 18,
+      "title": "Thunder Blade",
+      "searchQuery": "Thunder Blade",
+      "slug": "thunder-blade-sega-x"
+    },
+    {
+      "rank": 19,
+      "title": "Super Street Fighter II: The New Challengers, Super Street Fighter II Turbo (U) / Super Street Fighter II X: Grand Master Challenge (J)",
+      "searchQuery": "Super Street Fighter II:",
+      "slug": "super-street-fighter-ii-cp-system-ii"
+    },
+    {
+      "rank": 20,
+      "title": "Night Striker",
+      "searchQuery": "Night Striker",
+      "slug": "night-striker-taito-z-system"
+    },
+    {
+      "rank": 21,
+      "title": "Burning Force",
+      "searchQuery": "Burning Force",
+      "slug": "burning-force-namco-system-2"
+    },
+    {
+      "rank": 22,
+      "title": "Metal Hawk",
+      "searchQuery": "Metal Hawk",
+      "slug": "metal-hawk-namco-system-2"
+    },
+    {
+      "rank": 23,
+      "title": "Power Drift",
+      "searchQuery": "Power Drift",
+      "slug": "power-drift-sega-y"
+    },
+    {
+      "rank": 24,
+      "title": "Blazeon",
+      "searchQuery": "Blazeon",
+      "slug": "blazeon-arcade"
+    },
+    {
+      "rank": 25,
+      "title": "Hotdog Storm",
+      "searchQuery": "Hotdog Storm",
+      "slug": "hotdog-storm-arcade"
+    },
+    {
+      "rank": 26,
+      "title": "Bubble Bobble",
+      "searchQuery": "Bubble Bobble",
+      "slug": "bubble-bobble-arcade"
+    },
+    {
+      "rank": 27,
+      "title": "Cyber Sled",
+      "searchQuery": "Cyber Sled",
+      "slug": "cyber-sled-namco-system-21"
+    },
+    {
+      "rank": 28,
+      "title": "Ridge Racer",
+      "searchQuery": "Ridge Racer",
+      "slug": "ridge-racer-namco-system-22"
+    },
+    {
+      "rank": 29,
+      "title": "Thunder Force AC",
+      "searchQuery": "Thunder Force AC",
+      "slug": "thunder-force-ac-sega-system-c-2"
+    },
+    {
+      "rank": 30,
+      "title": "Metal Black",
+      "searchQuery": "Metal Black",
+      "slug": "metal-black-taito-f1-system"
+    },
+    {
+      "rank": 31,
+      "title": "The Outfoxies",
+      "searchQuery": "The Outfoxies",
+      "slug": "the-outfoxies-namco-nb-2"
+    },
+    {
+      "rank": 32,
+      "title": "Dirt Dash",
+      "searchQuery": "Dirt Dash",
+      "slug": "dirt-dash-namco-system-super-22"
+    },
+    {
+      "rank": 33,
+      "title": "Puyo Puyo Tsuu",
+      "searchQuery": "Puyo Puyo Tsuu",
+      "slug": "puyo-puyo-tsuu-sega-system-c-2"
+    },
+    {
+      "rank": 34,
+      "title": "Darius II (J) / Sagaia (W)",
+      "searchQuery": "Darius II",
+      "slug": "darius-ii-arcade"
+    },
+    {
+      "rank": 35,
+      "title": "Street Fighter Alpha 2 (U) / Street Fighter Zero 2 (J)",
+      "searchQuery": "Street Fighter Alpha 2",
+      "slug": "street-fighter-alpha-2-zero-2-cp-system-ii"
+    },
+    {
+      "rank": 36,
+      "title": "Vimana",
+      "searchQuery": "Vimana",
+      "slug": "vimana-toaplan-1"
+    },
+    {
+      "rank": 37,
+      "title": "Racing Hero",
+      "searchQuery": "Racing Hero",
+      "slug": "racing-hero-sega-x"
+    },
+    {
+      "rank": 38,
+      "title": "X-Men",
+      "searchQuery": "X-Men",
+      "slug": "x-men-arcade"
+    },
+    {
+      "rank": 39,
+      "title": "Hexion",
+      "searchQuery": "Hexion",
+      "slug": "hexion-arcade"
+    },
+    {
+      "rank": 40,
+      "title": "Xevious 3D/G",
+      "searchQuery": "Xevious 3D",
+      "slug": "xevious-3d-g-namco-system-11"
+    },
+    {
+      "rank": 41,
+      "title": "Over Drive (U) / オ一バ一・ドライブ(J)",
+      "searchQuery": "Over Drive",
+      "slug": "over-drive-arcade"
+    },
+    {
+      "rank": 42,
+      "title": "Super Locomotive",
+      "searchQuery": "Super Locomotive",
+      "slug": "super-locomotive-arcade"
+    },
+    {
+      "rank": 43,
+      "title": "Desert War (U) / Wangan Sensou (J)",
+      "searchQuery": "Desert War",
+      "slug": "desert-war-jaleco-mega-system-32"
+    },
+    {
+      "rank": 44,
+      "title": "Mega Man 2: The Power Fighters (U) / Rockman 2: The Power Fighters (J)",
+      "searchQuery": "Mega Man 2: The Power Fighters",
+      "slug": "mega-man-2-the-power-fighters-cp-system-ii"
+    },
+    {
+      "rank": 45,
+      "title": "Fighting Layer",
+      "searchQuery": "Fighting Layer",
+      "slug": "fighting-layer-namco-system-12"
+    },
+    {
+      "rank": 46,
+      "title": "Dimahoo (W) / Great Mahou Daisakusen (J)",
+      "searchQuery": "Dimahoo",
+      "slug": "dimahoo-cp-system-ii"
+    },
+    {
+      "rank": 47,
+      "title": "Knuckle Heads",
+      "searchQuery": "Knuckle Heads",
+      "slug": "knuckle-heads-namco-na-2"
+    },
+    {
+      "rank": 48,
+      "title": "Thunder Cross II",
+      "searchQuery": "Thunder Cross II",
+      "slug": "thunder-cross-ii-sunset-riders"
+    },
+    {
+      "rank": 49,
+      "title": "Shinobi",
+      "searchQuery": "Shinobi",
+      "slug": "shinobi"
+    },
+    {
+      "rank": 50,
+      "title": "Street Fighter Alpha (U) / Street Fighter Zero (J)",
+      "searchQuery": "Street Fighter Alpha",
+      "slug": "street-fighter-alpha-zero-cp-system-ii"
+    },
+    {
+      "rank": 51,
+      "title": "Namco Classic Collection Vol. 1",
+      "searchQuery": "Namco Classic Collection Vol. 1",
+      "slug": "namco-classic-collection-vol-1-namco-nd-1"
+    },
+    {
+      "rank": 52,
+      "title": "Ghouls'n Ghosts (UE) / Daimakaimura (J)",
+      "searchQuery": "Ghouls'n Ghosts",
+      "slug": "ghouls-n-ghosts-cp-system"
+    },
+    {
+      "rank": 53,
+      "title": "Xexex (W) / Orius (U)",
+      "searchQuery": "Xexex",
+      "slug": "xexex-arcade"
+    },
+    {
+      "rank": 54,
+      "title": "Cadillacs and Dinosaurs (UE) / Cadillacs: Kyouryuu Shinseiki (J)",
+      "searchQuery": "Cadillacs and Dinosaurs",
+      "slug": "cadillacs-and-dinosaurs-cp-system-dash"
+    },
+    {
+      "rank": 55,
+      "title": "Street Fighter EX / Street Fighter EX plus",
+      "searchQuery": "Street Fighter EX",
+      "slug": "street-fighter-ex-zn-1"
+    },
+    {
+      "rank": 56,
+      "title": "Marvel vs Capcom: Clash of Super Heroes",
+      "searchQuery": "Marvel vs Capcom: Clash",
+      "slug": "marvel-vs-capcom-clash-of-super-heroes-cp-system-ii"
+    },
+    {
+      "rank": 57,
+      "title": "X-Men: Children of the Atom",
+      "searchQuery": "X-Men: Children of the Atom",
+      "slug": "x-men-children-of-the-atom-cp-system-ii"
+    },
+    {
+      "rank": 58,
+      "title": "E.D.F.: Earth Defense Force",
+      "searchQuery": "E.D.F.: Earth Defense Force",
+      "slug": "e-d-f-earth-defense-force-jaleco-mega-system-1"
+    },
+    {
+      "rank": 59,
+      "title": "The Simpsons",
+      "searchQuery": "The Simpsons",
+      "slug": "the-simpsons-arcade"
+    },
+    {
+      "rank": 60,
+      "title": "Desert Assault (U) / Thunder Zone (JE)",
+      "searchQuery": "Desert Assault",
+      "slug": "desert-assault-arcade"
+    },
+    {
+      "rank": 61,
+      "title": "Namco Classic Collection Vol. 2",
+      "searchQuery": "Namco Classic Collection Vol. 2",
+      "slug": "namco-classic-collection-vol-2-namco-nd-1"
+    },
+    {
+      "rank": 62,
+      "title": "Salamander 2",
+      "searchQuery": "Salamander 2",
+      "slug": "salamander-2-konami-gx"
+    },
+    {
+      "rank": 63,
+      "title": "Bells &amp; Whistles (U) / Detana!! TwinBee (J)",
+      "searchQuery": "Bells &amp; Whistles",
+      "slug": "bells-whistles-konami-sunset-riders"
+    },
+    {
+      "rank": 64,
+      "title": "Teenage Mutant Ninja Turtles - Turtles in Time (U) / Teenage Mutant Hero Turtles - Turtles in Time (E)",
+      "searchQuery": "Teenage Mutant Ninja Turtles",
+      "slug": "teenage-mutant-ninja-turtles-turtles-in-time-arcade"
+    },
+    {
+      "rank": 65,
+      "title": "Shadowland (W) / Youkai Douchuuki (J)",
+      "searchQuery": "Shadowland",
+      "slug": "shadowland-namco-system-1"
+    },
+    {
+      "rank": 66,
+      "title": "Ridge Racer 2",
+      "searchQuery": "Ridge Racer 2",
+      "slug": "ridge-racer-2-namco-system-22"
+    },
+    {
+      "rank": 67,
+      "title": "Rolling Thunder 2",
+      "searchQuery": "Rolling Thunder 2",
+      "slug": "rolling-thunder-2-namco-system-2"
+    },
+    {
+      "rank": 68,
+      "title": "Fantasy Zone",
+      "searchQuery": "Fantasy Zone",
+      "slug": "fantasy-zone-sega-system-16a"
+    },
+    {
+      "rank": 69,
+      "title": "Chelnov: Atomic Runner",
+      "searchQuery": "Chelnov: Atomic Runner",
+      "slug": "chelnov-atomic-runner-karnov"
+    },
+    {
+      "rank": 70,
+      "title": "Street Fighter II: The World Warrior",
+      "searchQuery": "Street Fighter II: The",
+      "slug": "street-fighter-ii-the-world-warrior-cp-system"
+    },
+    {
+      "rank": 71,
+      "title": "Polygonet Commanders",
+      "searchQuery": "Polygonet Commanders",
+      "slug": "polygonet-commanders-konami-polygonet-hardware"
+    },
+    {
+      "rank": 72,
+      "title": "Marble Madness",
+      "searchQuery": "Marble Madness",
+      "slug": "marble-madness-atari-system-1"
+    },
+    {
+      "rank": 73,
+      "title": "Strike Fighter",
+      "searchQuery": "Strike Fighter",
+      "slug": "strike-fighter-sega-y"
+    },
+    {
+      "rank": 74,
+      "title": "R-Type Leo",
+      "searchQuery": "R-Type Leo",
+      "slug": "r-type-leo-irem-m92"
+    },
+    {
+      "rank": 75,
+      "title": "Kingdom Grandprix (W) / Shippu Mahou Daisakusen: Kingdom Grandprix (J)",
+      "searchQuery": "Kingdom Grandprix",
+      "slug": "kingdom-grandprix-toaplan-2"
+    },
+    {
+      "rank": 76,
+      "title": "Out Zone",
+      "searchQuery": "Out Zone",
+      "slug": "out-zone-toaplan-1"
+    },
+    {
+      "rank": 77,
+      "title": "Rainbow Islands",
+      "searchQuery": "Rainbow Islands",
+      "slug": "rainbow-islands-rainbow-islands"
+    },
+    {
+      "rank": 78,
+      "title": "The Fallen Angels (W) / Daraku Tenshi: The Fallen Angels (J)",
+      "searchQuery": "The Fallen Angels",
+      "slug": "the-fallen-angels-arcade"
+    },
+    {
+      "rank": 79,
+      "title": "Sorcer Striker (UE) / Mahou Daisakusen (J)",
+      "searchQuery": "Sorcer Striker",
+      "slug": "sorcer-striker-toaplan-2"
+    },
+    {
+      "rank": 80,
+      "title": "Rohga: Armor Force (U) / Wolf Fang: Kuhga 2001 (J)",
+      "searchQuery": "Rohga: Armor Force",
+      "slug": "rohga-armor-force-arcade"
+    },
+    {
+      "rank": 81,
+      "title": "Tekken Tag Tournament",
+      "searchQuery": "Tekken Tag Tournament",
+      "slug": "tekken-tag-tournament-namco-system-12"
+    },
+    {
+      "rank": 82,
+      "title": "Zero Wing",
+      "searchQuery": "Zero Wing",
+      "slug": "zero-wing-toaplan-1"
+    },
+    {
+      "rank": 83,
+      "title": "Racin' Force",
+      "searchQuery": "Racin' Force",
+      "slug": "racin-force-konami-gx"
+    },
+    {
+      "rank": 84,
+      "title": "Double Dragon II: The Revenge",
+      "searchQuery": "Double Dragon II: The Revenge",
+      "slug": "double-dragon-ii-the-revenge-double-dragon"
+    },
+    {
+      "rank": 85,
+      "title": "F-1 Grand Prix Star II",
+      "searchQuery": "F-1 Grand Prix Star II",
+      "slug": "f-1-grand-prix-star-ii-arcade"
+    },
+    {
+      "rank": 86,
+      "title": "Galaga '88",
+      "searchQuery": "Galaga '88",
+      "slug": "galaga-88-namco-system-1"
+    },
+    {
+      "rank": 87,
+      "title": "Tank Force",
+      "searchQuery": "Tank Force",
+      "slug": "tank-force-namco-system-1"
+    },
+    {
+      "rank": 88,
+      "title": "Thunder Dragon 2 / Big Bang: Power Shooting",
+      "searchQuery": "Thunder Dragon 2",
+      "slug": "thunder-dragon-2-arcade"
+    },
+    {
+      "rank": 89,
+      "title": "OutRunners",
+      "searchQuery": "OutRunners",
+      "slug": "outrunners-sega-system-multi-32"
+    },
+    {
+      "rank": 90,
+      "title": "Wild Pilot",
+      "searchQuery": "Wild Pilot",
+      "slug": "wild-pilot-arcade"
+    },
+    {
+      "rank": 91,
+      "title": "Double Dragon",
+      "searchQuery": "Double Dragon",
+      "slug": "double-dragon-arcade"
+    },
+    {
+      "rank": 92,
+      "title": "Bad Dudes vs. Dragonninja",
+      "searchQuery": "Dragon Ninja",
+      "slug": "bad-dudes-vs-dragonninja-data-east"
+    },
+    {
+      "rank": 93,
+      "title": "Sky Shark / Flying Shark",
+      "searchQuery": "Flying Shark",
+      "slug": "sky-shark-toaplan-1"
+    },
+    {
+      "rank": 94,
+      "title": "Turbo Out Run",
+      "searchQuery": "Turbo Out Run",
+      "slug": "turbo-out-run-arcade"
+    },
+    {
+      "rank": 95,
+      "title": "Enduro Racer",
+      "searchQuery": "Enduro Racer",
+      "slug": "enduro-racer-arcade"
+    },
+    {
+      "rank": 96,
+      "title": "G-LOC Air Battle",
+      "searchQuery": "G-LOC",
+      "slug": "g-loc-air-battle-sega-y"
+    },
+    {
+      "rank": 97,
+      "title": "RoboCop",
+      "searchQuery": "RoboCop",
+      "slug": "robocop-the-future-of-law-enforcement-data-east"
+    },
+    {
+      "rank": 98,
+      "title": "Karnov",
+      "searchQuery": "Karnov",
+      "slug": "karnov-arcade"
+    },
+    {
+      "rank": 99,
+      "title": "Heavy Barrel",
+      "searchQuery": "Heavy Barrel",
+      "slug": "heavy-barrel-data-east"
+    },
+    {
+      "rank": 100,
+      "title": "Act-Fancer: Cybernetick Hyper Weapon",
+      "searchQuery": "Act-Fancer",
+      "slug": "act-fancer-cybernetick-hyper-weapon-arcade"
+    }
+  ]
+}

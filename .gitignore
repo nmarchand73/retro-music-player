@@ -22,6 +22,7 @@ data/sndh/
 data/amiga/
 data/cpc/
 data/c64/
+data/vgm/
 data/cache/
 
 # Build trees for native helpers (shipped binary lives in vendor/bin/)
