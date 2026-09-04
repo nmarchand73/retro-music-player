@@ -157,6 +157,7 @@ app.put('/api/prefs', async (req, res) => {
       bookmarks?: unknown;
       libraryFilters?: unknown;
       visualizer?: unknown;
+      minitoo?: unknown;
     };
     res.json(await writePrefs(patch));
   } catch (err) {

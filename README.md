@@ -9,6 +9,7 @@ Repository: [github.com/nmarchand73/retro-music-player](https://github.com/nmarc
 - Search across Atari SNDH, Amiga UnExoticA, CPC SNDH/YM, and C64 HVSC
 - Playback: YM2149 (ST/CPC), SID (C64), libopenmpt trackers, UADE exotic Amiga
 - Expanded player with cover art (when available), title marquee, and Three.js spectrum
+- Optional **Divoom MiniToo** now-playing display (Settings → MiniToo)
 - Bookmarks, Top Games, Insights, and per-machine library filters
 
 ## Connected Databases
@@ -134,6 +135,25 @@ open "dist-mac/Retro Music Player.app"
 - Port default **3010** (so it can sit beside `npm run dev` on 3001); override with `PORT` / `RETRO_MUSIC_PORT`
 - Music dumps: `~/Library/Application Support/Retro Music Player/data` (build script **hardlinks** this checkout’s `data/*` there so Finder launch is not blocked by Documents TCC)
 - Logs: `~/Library/Logs/Retro Music Player.log`
+
+## MiniToo now-playing
+
+Mirror the current track on a [Divoom MiniToo](../Minitoo) pixel panel while audio plays.
+
+**Desktop `.app`:** the launcher starts the RFCOMM daemon + HTTP bridge itself (ports **40583** /
+**8766**). No separate Minitoo scripts required.
+
+1. Pair the MiniToo in macOS Bluetooth (and install `blueutil` if the audio profile blocks RFCOMM).
+2. Open Retro Music Player → **Settings → MiniToo display** → enable **Now playing on MiniToo**.
+3. Play a track — title / artist / platform appear on the device.
+
+Device MAC defaults from the bundled `DEVICE_MAC.txt`; override with
+`~/Library/Application Support/Retro Music Player/DEVICE_MAC.txt` or `MINITOO_DEVICE_MAC`.
+
+For `npm run desktop` from source, install the sibling package into the desktop venv
+(`npm run desktop:venv`) and keep `../Minitoo/interfaces/rfcomm/divoom-daemon` built.
+
+Override bridge URL with `VITE_MINITOO_BRIDGE_URL` (default `http://127.0.0.1:8766`). Docs: `Minitoo/docs/LIB.md`.
 
 ## Production
 

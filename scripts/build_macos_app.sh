@@ -114,11 +114,51 @@ echo "Installing Node dependencies inside bundle…"
   fi
 )
 
-echo "Creating pywebview venv…"
+echo "Creating pywebview + MiniToo venv…"
 "$BASE_PY" -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install -q --upgrade pip
 "$VENV_DIR/bin/python" -m pip install -q -r "$APP_DIR/requirements-desktop.txt"
+
+MINITOO_SRC="${MINITOO_SRC:-$ROOT/../Minitoo}"
+MINITOO_RES="$RES/minitoo"
+mkdir -p "$MINITOO_RES/bin"
+if [[ -d "$MINITOO_SRC/minitoo" ]]; then
+  echo "Bundling MiniToo from ${MINITOO_SRC}..."
+  # Non-editable install so site-packages lives inside the .app (autonome).
+  "$VENV_DIR/bin/python" -m pip install -q "${MINITOO_SRC}[bridge]"
+  if [[ -f "${MINITOO_SRC}/DEVICE_MAC.txt" ]]; then
+    cp "${MINITOO_SRC}/DEVICE_MAC.txt" "$MINITOO_RES/DEVICE_MAC.txt"
+  fi
+  if command -v swiftc >/dev/null 2>&1 && [[ -f "${MINITOO_SRC}/interfaces/rfcomm/DivoomDaemon.swift" ]]; then
+    echo "Compiling divoom-daemon..."
+    swiftc "${MINITOO_SRC}/interfaces/rfcomm/DivoomDaemon.swift" \
+      -framework Foundation -framework IOBluetooth -framework Network \
+      -o "$MINITOO_RES/bin/divoom-daemon"
+    chmod +x "$MINITOO_RES/bin/divoom-daemon"
+  else
+    DAEMON_SRC=""
+    for candidate in \
+      "${MINITOO_SRC}/interfaces/rfcomm/divoom-daemon" \
+      "${MINITOO_SRC}/tools/divoom-daemon"
+    do
+      if [[ -x "$candidate" ]]; then
+        DAEMON_SRC="$candidate"
+        break
+      fi
+    done
+    if [[ -n "$DAEMON_SRC" ]]; then
+      cp "$DAEMON_SRC" "$MINITOO_RES/bin/divoom-daemon"
+      chmod +x "$MINITOO_RES/bin/divoom-daemon"
+    else
+      echo "WARNING: no swiftc / divoom-daemon — MiniToo RFCOMM will be unavailable." >&2
+    fi
+  fi
+else
+  echo "WARNING: MiniToo source not found at ${MINITOO_SRC} — desktop MiniToo stack skipped." >&2
+fi
+
 "$VENV_DIR/bin/python" -c "import webview"
+"$VENV_DIR/bin/python" -c "import minitoo" 2>/dev/null || echo "NOTE: minitoo package not in venv"
 
 cat > "$MACOS/Retro Music Player" <<EOF
 #!/bin/bash
@@ -178,6 +218,8 @@ cat > "$CONTENTS/Info.plist" <<EOF
   <string>12.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>Retro Music Player opens a Bluetooth RFCOMM channel to show now-playing on a Divoom MiniToo.</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsLocalNetworking</key>
@@ -186,6 +228,11 @@ cat > "$CONTENTS/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
+
+# Ad-hoc sign helps TCC / Bluetooth on some macOS versions
+if command -v codesign >/dev/null 2>&1; then
+  codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+fi
 
 touch "$APP"
 

@@ -156,5 +156,51 @@ export function useBookmarks() {
     });
   }, []);
 
-  return { bookmarks, isBookmarked, toggleBookmark, patchBookmark };
+  /** Move a bookmark before another (by track keys). Used for drag-and-drop. */
+  const reorderBookmark = useCallback((fromKey: string, beforeKey: string) => {
+    if (fromKey === beforeKey) return;
+    setBookmarks((prev) => {
+      const from = prev.findIndex((entry) => trackKey(entry) === fromKey);
+      let to = prev.findIndex((entry) => trackKey(entry) === beforeKey);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      if (!item) return prev;
+      if (from < to) to -= 1;
+      next.splice(to, 0, item);
+      persist(next);
+      return next;
+    });
+  }, []);
+
+  /** Swap a bookmark with its neighbour in the current visible order. */
+  const moveBookmark = useCallback((key: string, delta: -1 | 1, visibleKeys: readonly string[]) => {
+    const visibleIndex = visibleKeys.indexOf(key);
+    const neighbourIndex = visibleIndex + delta;
+    if (visibleIndex < 0 || neighbourIndex < 0 || neighbourIndex >= visibleKeys.length) return;
+    const neighbourKey = visibleKeys[neighbourIndex];
+    if (!neighbourKey) return;
+    setBookmarks((prev) => {
+      const from = prev.findIndex((entry) => trackKey(entry) === key);
+      const to = prev.findIndex((entry) => trackKey(entry) === neighbourKey);
+      if (from < 0 || to < 0 || from === to) return prev;
+      const next = [...prev];
+      const tmp = next[from];
+      const other = next[to];
+      if (!tmp || !other) return prev;
+      next[from] = other;
+      next[to] = tmp;
+      persist(next);
+      return next;
+    });
+  }, []);
+
+  return {
+    bookmarks,
+    isBookmarked,
+    toggleBookmark,
+    patchBookmark,
+    reorderBookmark,
+    moveBookmark,
+  };
 }

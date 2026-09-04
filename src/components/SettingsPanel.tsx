@@ -48,6 +48,8 @@ interface SettingsPanelProps {
   onAudioFxAmount: (amount: number) => void;
   visualizerMode: VisualizerMode;
   onVisualizerMode: (mode: VisualizerMode) => void;
+  minitooEnabled: boolean;
+  onMiniTooEnabled: (enabled: boolean) => void;
   previewTracks: FxPreviewTracks;
   previewLoading: boolean;
   currentTrackId: string | null;
@@ -70,6 +72,8 @@ export function SettingsPanel({
   onAudioFxAmount,
   visualizerMode,
   onVisualizerMode,
+  minitooEnabled,
+  onMiniTooEnabled,
   previewTracks,
   previewLoading,
   currentTrackId,
@@ -165,6 +169,29 @@ export function SettingsPanel({
             );
           })}
         </fieldset>
+      </section>
+
+      <section className="settings-visualizer" aria-labelledby="settings-minitoo-heading">
+        <h3 className="settings-section-heading" id="settings-minitoo-heading">
+          MiniToo display
+        </h3>
+        <p className="muted">
+          Push title / artist / platform to a Divoom MiniToo while a track plays. The desktop app
+          starts the RFCOMM daemon and local bridge automatically (port 8766). Pair the device in
+          macOS Bluetooth first; optional <code>blueutil</code> helps free the audio profile.
+        </p>
+        <label className={`settings-machine-row${minitooEnabled ? ' is-on' : ''}`}>
+          <input
+            type="checkbox"
+            checked={minitooEnabled}
+            aria-label="MiniToo now playing"
+            onChange={(event) => onMiniTooEnabled(event.target.checked)}
+          />
+          <span className="settings-machine-copy">
+            <strong>Now playing on MiniToo</strong>
+            <span className="muted">Mirror the current track on the pixel panel</span>
+          </span>
+        </label>
       </section>
 
       <section className="settings-audio-fx" aria-labelledby="settings-audio-fx-heading">

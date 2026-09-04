@@ -4,6 +4,7 @@ Intent: native desktop shell for Retro Music Player (local window over Express).
 Architecture: owned Node server subprocess + pywebview (Cocoa); private_mode=False
 and a fixed preferred port so origin-scoped localStorage stays stable; UI prefs also
 mirror to ~/Library/Application Support/Retro Music Player/prefs.json via /api/prefs.
+Also owns Divoom MiniToo RFCOMM daemon + HTTP bridge children when available.
 Music dumps under Application Support (or repo data/ when developing); launch errors
 in Logs.
 Quality: 8/10 — MyChat / Chess Insight pattern adapted for Node + Vite dist.
@@ -30,8 +31,14 @@ LOG_FILE = LOG_DIR / "Retro Music Player.log"
 SUPPORT_DIR = Path.home() / "Library" / "Application Support" / "Retro Music Player"
 WEBVIEW_DIR = SUPPORT_DIR / "webview"
 PREFERRED_PORT = int(os.environ.get("PORT", os.environ.get("RETRO_MUSIC_PORT", "3010")))
+MINITOO_DAEMON_PORT = int(os.environ.get("MINITOO_DAEMON_PORT", "40583"))
+MINITOO_BRIDGE_PORT = int(os.environ.get("MINITOO_BRIDGE_PORT", "8766"))
 
 _server_proc: subprocess.Popen[str] | None = None
+_daemon_proc: subprocess.Popen[str] | None = None
+_bridge_proc: subprocess.Popen[str] | None = None
+_owned_daemon = False
+_owned_bridge = False
 
 
 def _log(msg: str) -> None:
@@ -234,15 +241,10 @@ def _find_tsx(app_root: Path) -> list[str]:
     )
 
 
-def _stop_server() -> None:
-    global _server_proc
-    proc = _server_proc
-    if proc is None:
+def _stop_proc(label: str, proc: subprocess.Popen[str] | None) -> None:
+    if proc is None or proc.poll() is not None:
         return
-    _server_proc = None
-    if proc.poll() is not None:
-        return
-    _log("[retro-music] Stopping Node server…")
+    _log(f"[retro-music] Stopping {label}…")
     try:
         proc.send_signal(signal.SIGTERM)
     except OSError:
@@ -250,7 +252,7 @@ def _stop_server() -> None:
     try:
         proc.wait(timeout=4.0)
     except subprocess.TimeoutExpired:
-        _log("[retro-music] Force-killing Node server")
+        _log(f"[retro-music] Force-killing {label}")
         try:
             proc.kill()
         except OSError:
@@ -259,6 +261,236 @@ def _stop_server() -> None:
             proc.wait(timeout=2.0)
         except subprocess.TimeoutExpired:
             pass
+
+
+def _stop_server() -> None:
+    global _server_proc
+    proc = _server_proc
+    _server_proc = None
+    _stop_proc("Node server", proc)
+
+
+def _stop_minitoo() -> None:
+    global _daemon_proc, _bridge_proc, _owned_daemon, _owned_bridge
+    if _owned_bridge:
+        _stop_proc("MiniToo bridge", _bridge_proc)
+    if _owned_daemon:
+        _stop_proc("MiniToo daemon", _daemon_proc)
+    _bridge_proc = None
+    _daemon_proc = None
+    _owned_bridge = False
+    _owned_daemon = False
+
+
+def _resolve_minitoo_dir() -> Path | None:
+    """Bundled Resources/minitoo, or sibling Minitoo checkout (dev)."""
+    bundled = ROOT.parent / "minitoo"
+    if (bundled / "bin" / "divoom-daemon").is_file():
+        return bundled
+    env = os.environ.get("MINITOO_ROOT", "").strip()
+    candidates: list[Path] = []
+    if env:
+        candidates.append(Path(env).expanduser().resolve())
+    candidates.append((ROOT.parent / "Minitoo").resolve())
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        if (
+            (candidate / "minitoo").is_dir()
+            or (candidate / "tools" / "divoom-daemon").is_file()
+            or (candidate / "interfaces" / "rfcomm" / "divoom-daemon").is_file()
+            or (candidate / "interfaces" / "rfcomm" / "DivoomDaemon.swift").is_file()
+        ):
+            return candidate
+    return None
+
+
+def _minitoo_daemon_bin(minitoo_dir: Path) -> Path | None:
+    for candidate in (
+        minitoo_dir / "bin" / "divoom-daemon",
+        minitoo_dir / "tools" / "divoom-daemon",
+        minitoo_dir / "interfaces" / "rfcomm" / "divoom-daemon",
+    ):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _read_minitoo_mac(minitoo_dir: Path) -> str | None:
+    env_mac = os.environ.get("MINITOO_DEVICE_MAC", "").strip()
+    if env_mac:
+        return env_mac
+    for path in (SUPPORT_DIR / "DEVICE_MAC.txt", minitoo_dir / "DEVICE_MAC.txt"):
+        try:
+            mac = path.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if mac:
+            return mac
+    return None
+
+
+def _is_minitoo_bridge(host: str, port: int) -> bool:
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(f"http://{host}:{port}/v1/health", timeout=0.8) as resp:
+            if resp.getcode() != 200:
+                return False
+            body = resp.read(800).decode("utf-8", errors="ignore")
+            return '"daemon"' in body and '"ok"' in body
+    except Exception:
+        return False
+
+
+def _wait_minitoo_bridge(host: str, port: int, timeout: float = 8.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _is_minitoo_bridge(host, port):
+            return True
+        if _bridge_proc is not None and _bridge_proc.poll() is not None:
+            return False
+        time.sleep(0.15)
+    return False
+
+
+def _minitoo_importable() -> bool:
+    try:
+        import minitoo  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _maybe_disconnect_audio(mac: str) -> None:
+    blueutil = shutil.which("blueutil")
+    if not blueutil:
+        return
+    try:
+        subprocess.run(
+            [blueutil, "--disconnect", mac],
+            check=False,
+            capture_output=True,
+            timeout=8,
+        )
+        time.sleep(0.8)
+    except Exception as exc:
+        _log(f"[retro-music] blueutil disconnect skipped: {exc}")
+
+
+def _start_minitoo() -> None:
+    """Soft-start RFCOMM daemon + HTTP bridge. Never blocks app launch."""
+    global _daemon_proc, _bridge_proc, _owned_daemon, _owned_bridge
+
+    host = "127.0.0.1"
+    minitoo_dir = _resolve_minitoo_dir()
+    if minitoo_dir is None:
+        _log("[retro-music] MiniToo: no bundled/sibling stack — skip")
+        return
+
+    if not _minitoo_importable():
+        _log(
+            "[retro-music] MiniToo: Python package missing in this venv "
+            "(pip install sibling Minitoo[bridge]) — skip"
+        )
+        return
+
+    daemon_bin = _minitoo_daemon_bin(minitoo_dir)
+    mac = _read_minitoo_mac(minitoo_dir)
+
+    # Seed Application Support MAC from bundle so users can override later.
+    support_mac = SUPPORT_DIR / "DEVICE_MAC.txt"
+    if mac and not support_mac.is_file():
+        try:
+            SUPPORT_DIR.mkdir(parents=True, exist_ok=True)
+            support_mac.write_text(mac + "\n", encoding="utf-8")
+        except OSError:
+            pass
+
+    if not _port_open(host, MINITOO_DAEMON_PORT):
+        if daemon_bin is None or not mac:
+            _log(
+                "[retro-music] MiniToo: daemon not running and no binary/MAC "
+                f"(dir={minitoo_dir}) — skip"
+            )
+            return
+        _maybe_disconnect_audio(mac)
+        try:
+            log_fh: IO[str] = LOG_FILE.open("a", encoding="utf-8")
+            cmd = [str(daemon_bin), mac, "1", str(MINITOO_DAEMON_PORT)]
+            _log(f"[retro-music] Starting MiniToo daemon: {' '.join(cmd)}")
+            _daemon_proc = subprocess.Popen(
+                cmd,
+                cwd=str(minitoo_dir),
+                stdout=log_fh,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            _owned_daemon = True
+            time.sleep(1.0)
+            if _daemon_proc.poll() is not None:
+                _log("[retro-music] MiniToo daemon exited immediately — skip bridge")
+                _owned_daemon = False
+                _daemon_proc = None
+                return
+        except OSError as exc:
+            _log(f"[retro-music] MiniToo daemon failed to start: {exc}")
+            return
+    else:
+        _log(f"[retro-music] MiniToo: reusing daemon on :{MINITOO_DAEMON_PORT}")
+
+    if _is_minitoo_bridge(host, MINITOO_BRIDGE_PORT):
+        _log(f"[retro-music] MiniToo: reusing bridge on :{MINITOO_BRIDGE_PORT}")
+        return
+
+    if _port_open(host, MINITOO_BRIDGE_PORT):
+        pids = _pids_listening_on_port(MINITOO_BRIDGE_PORT)
+        _log(
+            f"[retro-music] MiniToo: reclaiming bridge port {MINITOO_BRIDGE_PORT} "
+            f"(PIDs {pids or '?'})"
+        )
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+        _wait_port_closed(host, MINITOO_BRIDGE_PORT, timeout=3.0)
+
+    env = os.environ.copy()
+    env["MINITOO_DAEMON_HOST"] = host
+    env["MINITOO_DAEMON_PORT"] = str(MINITOO_DAEMON_PORT)
+    env["MINITOO_BRIDGE_HOST"] = host
+    env["MINITOO_BRIDGE_PORT"] = str(MINITOO_BRIDGE_PORT)
+    try:
+        log_fh = LOG_FILE.open("a", encoding="utf-8")
+        cmd = [
+            sys.executable,
+            "-m",
+            "minitoo.bridge",
+            "--host",
+            host,
+            "--port",
+            str(MINITOO_BRIDGE_PORT),
+        ]
+        _log(f"[retro-music] Starting MiniToo bridge: {' '.join(cmd)}")
+        _bridge_proc = subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            env=env,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        _owned_bridge = True
+    except OSError as exc:
+        _log(f"[retro-music] MiniToo bridge failed to start: {exc}")
+        return
+
+    if _wait_minitoo_bridge(host, MINITOO_BRIDGE_PORT):
+        _log(f"[retro-music] MiniToo bridge ready http://{host}:{MINITOO_BRIDGE_PORT}")
+    else:
+        _log("[retro-music] MiniToo bridge did not become healthy (continuing without it)")
 
 
 def _start_server(app_root: Path, host: str, port: int, data_dir: Path) -> None:
@@ -287,6 +519,7 @@ def _start_server(app_root: Path, host: str, port: int, data_dir: Path) -> None:
         stderr=subprocess.STDOUT,
         text=True,
     )
+    atexit.register(_stop_minitoo)
     atexit.register(_stop_server)
 
 
@@ -345,6 +578,10 @@ def main() -> int:
         return 1
 
     _log(f"[retro-music] Serving http://{host}:{port}")
+    try:
+        _start_minitoo()
+    except Exception as exc:
+        _log(f"[retro-music] MiniToo start error (non-fatal): {exc}")
     url = f"http://{host}:{port}/"
 
     class DesktopApi:
@@ -415,6 +652,7 @@ def main() -> int:
     try:
         webview.start(private_mode=False, storage_path=str(WEBVIEW_DIR))
     finally:
+        _stop_minitoo()
         _stop_server()
         _log("[retro-music] Quit")
     return 0

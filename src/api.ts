@@ -85,6 +85,7 @@ export type ClientPrefsPayload = {
   bookmarks?: unknown;
   libraryFilters?: unknown;
   visualizer?: unknown;
+  minitoo?: unknown;
 };
 
 export async function fetchPrefs(): Promise<ClientPrefsPayload> {

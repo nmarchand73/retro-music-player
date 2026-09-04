@@ -8,6 +8,7 @@ export type StoredPrefs = {
   bookmarks?: unknown;
   libraryFilters?: unknown;
   visualizer?: unknown;
+  minitoo?: unknown;
 };
 
 function prefsFilePath(): string {
@@ -54,6 +55,7 @@ export async function writePrefs(patch: StoredPrefs): Promise<StoredPrefs> {
   if ('bookmarks' in patch) next.bookmarks = patch.bookmarks;
   if ('libraryFilters' in patch) next.libraryFilters = patch.libraryFilters;
   if ('visualizer' in patch) next.visualizer = patch.visualizer;
+  if ('minitoo' in patch) next.minitoo = patch.minitoo;
   await fs.writeFile(file, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   return next;
 }

@@ -10,6 +10,8 @@ import { useLibraryFilters } from './hooks/useLibraryFilters';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useFxPreviewTracks } from './hooks/useFxPreviewTracks';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
+import { useMiniTooNowPlaying } from './hooks/useMiniTooNowPlaying';
+import { useMiniTooSettings } from './hooks/useMiniTooSettings';
 import { useVisualizerSettings } from './hooks/useVisualizerSettings';
 import type { DatabaseInfo, LibrarySearch, MusicPlatform, SearchField, Track } from './types';
 import { SEARCH_FIELD_LABELS, SEARCH_FIELD_PLACEHOLDERS } from './types';
@@ -36,12 +38,14 @@ function App() {
   const { audioFx, setEnabled: setAudioFxEnabled, setPreset: setAudioFxPreset, setAmount: setAudioFxAmount } =
     useAudioFxSettings();
   const { visualizerMode, setVisualizerMode } = useVisualizerSettings();
+  const { minitoo, setMiniTooEnabled } = useMiniTooSettings();
   const { tracks: fxPreviewTracks, loading: fxPreviewLoading } = useFxPreviewTracks();
   const activeMachines = useMemo(() => enabledMachines(machines), [machines]);
   const machinesParam = useMemo(() => machinesQueryValue(machines), [machines]);
 
   const player = useMusicPlayer(audioFx);
-  const { bookmarks, isBookmarked, toggleBookmark, patchBookmark } = useBookmarks();
+  const { bookmarks, isBookmarked, toggleBookmark, patchBookmark, reorderBookmark, moveBookmark } =
+    useBookmarks();
   const reportedDurationRef = useRef<string | null>(null);
   const visibleTracks = useMemo(() => {
     const source = view === 'bookmarks' ? bookmarks : tracks;
@@ -151,6 +155,15 @@ function App() {
       game: current.game ?? match.game,
     };
   }, [bookmarks, currentTrackId, player.currentTrack]);
+
+  useMiniTooNowPlaying({
+    enabled: minitoo.enabled,
+    track: displayTrack,
+    status: player.status,
+    duration: player.duration,
+    position: player.position,
+  });
+
   const currentIndex = useMemo(() => {
     if (!player.currentTrack) return -1;
     return visibleTracks.findIndex((track) => trackKey(track) === currentTrackId);
@@ -330,6 +343,8 @@ function App() {
           onView={setView}
           isBookmarked={isBookmarked}
           onToggleBookmark={toggleBookmark}
+          onReorderBookmark={reorderBookmark}
+          onMoveBookmark={moveBookmark}
           onActivate={handleActivate}
           onSearch={handleFacetSearch}
           machines={machines}
@@ -342,6 +357,8 @@ function App() {
           onAudioFxAmount={setAudioFxAmount}
           visualizerMode={visualizerMode}
           onVisualizerMode={setVisualizerMode}
+          minitooEnabled={minitoo.enabled}
+          onMiniTooEnabled={setMiniTooEnabled}
           fxPreviewTracks={fxPreviewTracks}
           fxPreviewLoading={fxPreviewLoading}
         />

@@ -28,6 +28,11 @@ const EXTRA_SLUGS = [
     title: 'Sky Shark / Flying Shark',
     searchQuery: 'Flying Shark',
   },
+  {
+    slug: 'p-47-the-phantom-fighter-mega-system-1',
+    title: 'P-47: The Phantom Fighter',
+    searchQuery: 'P-47',
+  },
   { slug: 'turbo-out-run-arcade', title: 'Turbo Out Run', searchQuery: 'Turbo Out Run' },
   { slug: 'after-burner-ii-sega-x', title: 'After Burner II', searchQuery: 'After Burner' },
   { slug: 'space-harrier-hang-on', title: 'Space Harrier', searchQuery: 'Space Harrier' },

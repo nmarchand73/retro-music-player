@@ -45,6 +45,8 @@ interface TrackListProps {
   onView: (view: LibraryView) => void;
   isBookmarked: (track: Track) => boolean;
   onToggleBookmark: (track: Track) => void;
+  onReorderBookmark?: (fromKey: string, beforeKey: string) => void;
+  onMoveBookmark?: (key: string, delta: -1 | 1, visibleKeys: readonly string[]) => void;
   onActivate: (track: Track) => void;
   onSearch: (search: LibrarySearch) => void;
   machines: MachineSettings;
@@ -57,6 +59,8 @@ interface TrackListProps {
   onAudioFxAmount: (amount: number) => void;
   visualizerMode: VisualizerMode;
   onVisualizerMode: (mode: VisualizerMode) => void;
+  minitooEnabled: boolean;
+  onMiniTooEnabled: (enabled: boolean) => void;
   fxPreviewTracks: FxPreviewTracks;
   fxPreviewLoading: boolean;
 }
@@ -350,6 +354,8 @@ export function TrackList({
   onView,
   isBookmarked,
   onToggleBookmark,
+  onReorderBookmark,
+  onMoveBookmark,
   onActivate,
   onSearch,
   machines,
@@ -362,6 +368,8 @@ export function TrackList({
   onAudioFxAmount,
   visualizerMode,
   onVisualizerMode,
+  minitooEnabled,
+  onMiniTooEnabled,
   fxPreviewTracks,
   fxPreviewLoading,
 }: TrackListProps) {
@@ -376,6 +384,10 @@ export function TrackList({
   }, [currentTrackId]);
 
   const heading = viewHeading(view);
+  const bookmarkCustomOrder = view === 'bookmarks' && sort === 'match';
+  const visibleKeys = useMemo(() => tracks.map((track) => trackKey(track)), [tracks]);
+  const dragKeyRef = useRef<string | null>(null);
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   const tabs = (
     <div className="view-tabs" role="tablist" aria-label="Library views">
       <button
@@ -451,7 +463,7 @@ export function TrackList({
         >
           {(Object.entries(SORT_LABELS) as [SortKey, string][]).map(([value, label]) => (
             <option key={value} value={value}>
-              {label}
+              {view === 'bookmarks' && value === 'match' ? 'Custom order' : label}
             </option>
           ))}
         </select>
@@ -495,6 +507,8 @@ export function TrackList({
           onAudioFxAmount={onAudioFxAmount}
           visualizerMode={visualizerMode}
           onVisualizerMode={onVisualizerMode}
+          minitooEnabled={minitooEnabled}
+          onMiniTooEnabled={onMiniTooEnabled}
           previewTracks={fxPreviewTracks}
           previewLoading={fxPreviewLoading}
           currentTrackId={currentTrackId}
@@ -534,7 +548,11 @@ export function TrackList({
 
   const subtitle =
     view === 'bookmarks'
-      ? `${tracks.length} saved ${tracks.length === 1 ? 'title' : 'titles'}`
+      ? `${tracks.length} saved ${tracks.length === 1 ? 'title' : 'titles'}${
+          bookmarkCustomOrder
+            ? ' · drag to reorder'
+            : ' · set Sort to Custom order to reorder'
+        }`
       : query.trim()
         ? `${tracks.length} matches · ${SEARCH_FIELD_LABELS[searchField]}`
         : `${tracks.length} tracks from the archive · type above to search`;
@@ -549,8 +567,8 @@ export function TrackList({
         </div>
         {listTools}
       </header>
-      <ul className="track-list">
-        {tracks.map((track) => {
+      <ul className={`track-list${bookmarkCustomOrder ? ' is-reorderable' : ''}`}>
+        {tracks.map((track, index) => {
           const id = trackKey(track);
           const active = currentTrackId === id;
           const playing = active && playerStatus === 'playing';
@@ -560,13 +578,96 @@ export function TrackList({
           );
           const actionLabel = durationLabel ? `${action} ${track.title}, ${durationLabel}` : `${action} ${track.title}`;
           const bookmarked = isBookmarked(track);
+          const canMoveUp = bookmarkCustomOrder && index > 0;
+          const canMoveDown = bookmarkCustomOrder && index < tracks.length - 1;
           return (
             <li
               key={id}
               ref={active ? activeItemRef : undefined}
-              className={active ? 'active' : ''}
+              className={`${active ? 'active' : ''}${
+                bookmarkCustomOrder && dropTargetKey === id ? ' is-drop-target' : ''
+              }`.trim()}
+              onDragOver={
+                bookmarkCustomOrder
+                  ? (event) => {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = 'move';
+                      if (dragKeyRef.current && dragKeyRef.current !== id) {
+                        setDropTargetKey(id);
+                      }
+                    }
+                  : undefined
+              }
+              onDragLeave={
+                bookmarkCustomOrder
+                  ? () => {
+                      setDropTargetKey((current) => (current === id ? null : current));
+                    }
+                  : undefined
+              }
+              onDrop={
+                bookmarkCustomOrder
+                  ? (event) => {
+                      event.preventDefault();
+                      const fromKey =
+                        event.dataTransfer.getData('text/bookmark-key') || dragKeyRef.current;
+                      dragKeyRef.current = null;
+                      setDropTargetKey(null);
+                      if (!fromKey || fromKey === id || !onReorderBookmark) return;
+                      onReorderBookmark(fromKey, id);
+                      onSort('match');
+                    }
+                  : undefined
+              }
             >
-              <div className={`track-row${active ? ' is-active' : ''}`}>
+              <div
+                className={`track-row${active ? ' is-active' : ''}${
+                  bookmarkCustomOrder ? ' is-reorderable' : ''
+                }`}
+              >
+                {bookmarkCustomOrder ? (
+                  <span className="track-reorder">
+                    <button
+                      type="button"
+                      className="track-reorder-handle"
+                      draggable
+                      aria-label={`Drag to reorder ${track.title}`}
+                      title="Drag to reorder"
+                      onDragStart={(event) => {
+                        dragKeyRef.current = id;
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/bookmark-key', id);
+                        event.dataTransfer.setData('text/plain', track.title);
+                      }}
+                      onDragEnd={() => {
+                        dragKeyRef.current = null;
+                        setDropTargetKey(null);
+                      }}
+                    >
+                      <span aria-hidden="true">⋮⋮</span>
+                    </button>
+                    <span className="track-reorder-steps">
+                      <button
+                        type="button"
+                        className="track-reorder-step"
+                        aria-label={`Move ${track.title} up`}
+                        disabled={!canMoveUp}
+                        onClick={() => onMoveBookmark?.(id, -1, visibleKeys)}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className="track-reorder-step"
+                        aria-label={`Move ${track.title} down`}
+                        disabled={!canMoveDown}
+                        onClick={() => onMoveBookmark?.(id, 1, visibleKeys)}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   className={`track-play ${playing ? 'playing' : ''}`}

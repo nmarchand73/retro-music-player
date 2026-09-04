@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-24",
+  "generated_at": "2026-08-25",
   "description": "Top reconstitué des diffusions arcade en France (fin 80s–90s) : charts US/UK, témoignages FR (cafés Jeutel, forains, salles), packs VGMRips jouables.",
   "source": {
     "name": "Diffusions arcade France (reconstitué)",
@@ -100,126 +100,140 @@
       "era": "1987"
     },
     {
-      "rank": 14,
+      "title": "Flying Shark / Sky Shark",
+      "searchQuery": "Flying Shark",
+      "slug": "sky-shark-toaplan-1",
+      "era": "1987",
+      "rank": 14
+    },
+    {
+      "title": "P-47: The Phantom Fighter",
+      "searchQuery": "P-47",
+      "slug": "p-47-the-phantom-fighter-mega-system-1",
+      "era": "1988",
+      "rank": 15
+    },
+    {
+      "rank": 16,
       "title": "Bad Dudes vs. DragonNinja",
       "searchQuery": "Bad Dudes",
       "slug": "bad-dudes-vs-dragonninja-data-east",
       "era": "1988"
     },
     {
-      "rank": 15,
+      "rank": 17,
       "title": "Ghouls'n Ghosts",
       "searchQuery": "Ghouls n Ghosts",
       "slug": "ghouls-n-ghosts-cp-system",
       "era": "1988"
     },
     {
-      "rank": 16,
+      "rank": 18,
       "title": "1943: The Battle of Midway",
       "searchQuery": "1943",
       "slug": "1943-the-battle-of-midway-1943",
       "era": "1987"
     },
     {
-      "rank": 17,
+      "rank": 19,
       "title": "Altered Beast",
       "searchQuery": "Altered Beast",
       "slug": "altered-beast-sega-system-16b",
       "era": "1988"
     },
     {
-      "rank": 18,
+      "rank": 20,
       "title": "Rastan Saga",
       "searchQuery": "Rastan",
       "slug": "rastan-arcade",
       "era": "1987"
     },
     {
-      "rank": 19,
+      "rank": 21,
       "title": "Track & Field",
       "searchQuery": "Track Field",
       "slug": "track-field-arcade",
       "era": "1983"
     },
     {
-      "rank": 20,
+      "rank": 22,
       "title": "Teenage Mutant Ninja Turtles: Turtles in Time",
       "searchQuery": "Turtles in Time",
       "slug": "teenage-mutant-ninja-turtles-turtles-in-time-arcade",
       "era": "1991"
     },
     {
-      "rank": 21,
+      "rank": 23,
       "title": "The Simpsons Arcade Game",
       "searchQuery": "Simpsons",
       "slug": "the-simpsons-arcade",
       "era": "1991"
     },
     {
-      "rank": 22,
+      "rank": 24,
       "title": "Sunset Riders",
       "searchQuery": "Sunset Riders",
       "slug": "sunset-riders-konami-sunset-riders",
       "era": "1991"
     },
     {
-      "rank": 23,
+      "rank": 25,
       "title": "X-Men",
       "searchQuery": "X-Men",
       "slug": "x-men-arcade",
       "era": "1992"
     },
     {
-      "rank": 24,
+      "rank": 26,
       "title": "Knights of the Round",
       "searchQuery": "Knights of the Round",
       "slug": "knights-of-the-round-cp-system-1",
       "era": "1991"
     },
     {
-      "rank": 25,
+      "rank": 27,
       "title": "Cadillacs and Dinosaurs",
       "searchQuery": "Cadillacs and Dinosaurs",
       "slug": "cadillacs-and-dinosaurs-cp-system-dash",
       "era": "1993"
     },
     {
-      "rank": 26,
+      "rank": 28,
       "title": "Virtua Fighter",
       "searchQuery": "Virtua Fighter",
       "slug": "virtua-fighter-sega-model-1",
       "era": "1993"
     },
     {
-      "rank": 27,
+      "rank": 29,
       "title": "Tekken",
       "searchQuery": "Tekken",
       "slug": "tekken-namco-system-11",
       "era": "1994"
     },
     {
-      "rank": 28,
+      "rank": 30,
       "title": "The King of Fighters '94",
       "searchQuery": "King of Fighters 94",
       "slug": "the-king-of-fighters-94-snk-neo-geo",
       "era": "1994"
     },
     {
-      "rank": 29,
+      "rank": 31,
       "title": "Metal Slug",
       "searchQuery": "Metal Slug",
       "slug": "metal-slug-snk-neo-geo",
       "era": "1996"
     },
     {
-      "rank": 30,
+      "rank": 32,
       "title": "Asterix",
       "searchQuery": "Asterix",
       "slug": "asterix-arcade",
       "era": "1992"
     },
     {
-      "rank": 31,
+      "rank": 33,
       "title": "Puzzle Bobble",
       "searchQuery": "Puzzle Bobble",
       "slug": "puzzle-bobble-neo-geo",
@@ -227,28 +241,28 @@
       "note": "Neo Geo pack; Taito F2 coin-op not on VGMRips"
     },
     {
-      "rank": 32,
+      "rank": 34,
       "title": "Super Pang",
       "searchQuery": "Super Pang",
       "slug": "super-pang-mitchell",
       "era": "1990"
     },
     {
-      "rank": 33,
+      "rank": 35,
       "title": "Arkanoid",
       "searchQuery": "Arkanoid",
       "slug": "arkanoid-arcade",
       "era": "1986"
     },
     {
-      "rank": 34,
+      "rank": 36,
       "title": "1942",
       "searchQuery": "1942",
       "slug": "1942-arcade",
       "era": "1984"
     },
     {
-      "rank": 35,
+      "rank": 37,
       "title": "Super Hang-On",
       "searchQuery": "Super Hang-On",
       "slug": "super-hang-on-arcade",

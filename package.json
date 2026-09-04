@@ -11,7 +11,7 @@
     "copy-worklets": "node scripts/copy-worklets.js",
     "start": "tsx server/index.ts",
     "desktop": "desktop-venv/bin/python desktop_app.py",
-    "desktop:venv": "python3 -m venv desktop-venv && desktop-venv/bin/python -m pip install -U pip && desktop-venv/bin/python -m pip install -r requirements-desktop.txt",
+    "desktop:venv": "python3 -m venv desktop-venv && desktop-venv/bin/python -m pip install -U pip && desktop-venv/bin/python -m pip install -r requirements-desktop.txt && (test -d ../Minitoo && desktop-venv/bin/python -m pip install -e '../Minitoo[bridge]' || true)",
     "desktop:build": "bash scripts/build_macos_app.sh",
     "desktop:open": "open \"dist-mac/Retro Music Player.app\"",
     "lint": "oxlint",

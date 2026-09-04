@@ -46,6 +46,8 @@ function pathToId(relativePath: string): string {
 /** Extra tokens for search (regional / marketing titles). */
 const GAME_SEARCH_ALIASES: Readonly<Record<string, readonly string[]>> = {
   'Sky Shark': ['Flying Shark', 'Hishou Zame', 'Hishouzame'],
+  'P-47 - The Phantom Fighter': ['P-47', 'P47', 'Phantom Fighter', 'Thunderbolt'],
+  'P-47: The Phantom Fighter': ['P-47', 'P47', 'Phantom Fighter', 'Thunderbolt'],
   'Bad Dudes vs. Dragonninja': ['Dragon Ninja', 'Dragonninja', 'Bad Dudes'],
   'Salamander': ['Nemesis', 'Gradius', 'Life Force', 'Salamander'],
   'Salamander 2': ['Salamander 2'],
