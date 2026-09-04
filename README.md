@@ -138,14 +138,15 @@ open "dist-mac/Retro Music Player.app"
 
 ## MiniToo now-playing
 
-Mirror the current track on a [Divoom MiniToo](../Minitoo) pixel panel while audio plays.
+Mirror the current track on a [Divoom MiniToo](https://github.com/nmarchand73/divoom_retro_player) pixel panel while audio plays.
 
 **Desktop `.app`:** the launcher starts the RFCOMM daemon + HTTP bridge itself (ports **40583** /
-**8766**). No separate Minitoo scripts required.
+**8766**). No separate Minitoo scripts required. The panel shows a live **progress bar** and
+clock (~1 s updates), with a title marquee when needed.
 
 1. Pair the MiniToo in macOS Bluetooth (and install `blueutil` if the audio profile blocks RFCOMM).
 2. Open Retro Music Player → **Settings → MiniToo display** → enable **Now playing on MiniToo**.
-3. Play a track — title / artist / platform appear on the device.
+3. Play a track — title / artist / platform / time appear on the device.
 
 Device MAC defaults from the bundled `DEVICE_MAC.txt`; override with
 `~/Library/Application Support/Retro Music Player/DEVICE_MAC.txt` or `MINITOO_DEVICE_MAC`.
@@ -153,7 +154,7 @@ Device MAC defaults from the bundled `DEVICE_MAC.txt`; override with
 For `npm run desktop` from source, install the sibling package into the desktop venv
 (`npm run desktop:venv`) and keep `../Minitoo/interfaces/rfcomm/divoom-daemon` built.
 
-Override bridge URL with `VITE_MINITOO_BRIDGE_URL` (default `http://127.0.0.1:8766`). Docs: `Minitoo/docs/LIB.md`.
+Override bridge URL with `VITE_MINITOO_BRIDGE_URL` (default `http://127.0.0.1:8766`). Docs: [divoom_retro_player/docs/LIB.md](https://github.com/nmarchand73/divoom_retro_player/blob/main/docs/LIB.md).
 
 ## Production
 
